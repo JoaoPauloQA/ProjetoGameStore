@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameStore - Loja de Jogos Digitais</title>
+  <link rel="stylesheet" href="styles/style.css">
+  <link rel="stylesheet" href="styles/checkout.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+
+
+
+<body>
+  
+<hr>
+
+    <div id="purchaseModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="gameTitle">
+      <div class="modal-content" tabindex="-1">
+        <h2 id="gameTitle"></h2>
+        <p id="gamePrice"></p>
+        <p id="gameDescription">Garanta sua compra e aproveite!</p>
+        <div class="modal-actions">
+          <button id="modalAddCart" class="buy-btn" aria-label="Adicionar ao carrinho">Adicionar ao carrinho</button>
+          <button id="modalAddWish" class="modal-wish" aria-label="Adicionar à lista de desejos">Desejo</button>
+          <button id="closeModal" class="modal-close" aria-label="Fechar diálogo">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div id="checkoutModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="checkoutTitle">
+      <div class="modal-content" tabindex="-1">
+        <h2 id="checkoutTitle">Finalizar Compra</h2>
+        <div class="checkout-body">
+          <div class="checkout-cover">
+            <img id="checkoutGameImage" alt="Capa do jogo" />
+          </div>
+          <div class="checkout-details">
+          <p>Jogo: <span id="checkoutGameName"></span></p>
+          <p>Preço: <span id="checkoutGamePrice"></span></p>
+          <hr>
+          <p><strong>Gêneros:</strong> <span id="checkoutGenres">—</span></p>
+          <p><strong>Plataformas:</strong> <span id="checkoutPlatforms">—</span></p>
+          <p><strong>Nota média:</strong> <span id="checkoutRating">—</span></p>
+          <div style="margin-top:10px"><strong>Descrição:</strong>
+            <p id="checkoutDescription" style="margin:6px 0;color:#ddd">Carregando...</p>
+          </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="addToCartFromCheckout" class="secondary-btn" type="button">Adicionar ao carrinho</button>
+          <button id="closeCheckout" class="modal-close">Fechar</button>
+        </div>
+        <div id="checkoutMessage" class="checkout-message" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+
+
+    <!-- Carrinho Modal -->
+    <div id="cartModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="cartTitle">
+      <div class="modal-content" tabindex="-1">
+        <h2 id="cartTitle">Seu Carrinho</h2>
+        <div id="cartItems" class="cart-items">
+          <!-- items adicionados dinamicamente -->
+        </div>
+        <p id="cartTotal">Total: R$ 0,00</p>
+        <div class="modal-actions">
+          <button id="checkoutBtn" class="buy-btn">Finalizar Compra</button>
+          <button id="closeCart" class="modal-close">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    
+
+    <!-- Wishlist Modal -->
+    <div id="wishModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="wishTitle">
+      <div class="modal-content" tabindex="-1">
+        <h2 id="wishTitle">Lista de Desejos</h2>
+        <div id="wishItems" class="cart-items">
+          <!-- itens da wishlist -->
+        </div>
+        <div class="modal-actions">
+          <button id="closeWish" class="modal-close">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Platform Filter Modal -->
+    <div id="platformModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="platformTitle">
+      <div class="modal-content" tabindex="-1">
+        <h2 id="platformTitle">🎮 Plataformas</h2>
+        <form id="platformFilters" class="platform-filters" aria-label="Filtrar por plataforma">
+          <label><input type="checkbox" name="platform" value="ps" id="pf-ps"> PlayStation</label>
+          <label><input type="checkbox" name="platform" value="xbox" id="pf-xbox"> Xbox</label>
+          <label><input type="checkbox" name="platform" value="pc" id="pf-pc"> PC</label>
+        </form>
+        <div class="modal-actions">
+          <button id="closePlatform" class="modal-close">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+  <header class="header">
+    <div class="logo">
+      
+  <img src="https://png.pngtree.com/thumb_back/fh260/background/20240913/pngtree-blue-neon-game-controller-stock-photo-image_16181185.jpg" alt="Logo da GameStore" class="logo-img">
+  <span>GameStore</span>
+</div>
+    <nav id="main-nav" class="navbar" aria-label="Navegação principal">
+      <!-- Barra de pesquisa de jogos -->
+      <form id="searchForm" class="search-form" role="search" aria-label="Pesquisar jogos">
+        <label for="searchInput" class="visually-hidden">Pesquisar jogos</label>
+        <input id="searchInput" class="search-input" type="search" placeholder="Oque voce esta procurando hoje ?" aria-label="Pesquisar jogo" autocomplete="off" />
+        <button type="submit" class="search-btn" aria-label="Pesquisar">🔍</button>
+        <div id="searchSuggestions" class="search-suggestions" aria-live="polite"></div>
+      </form>
+      <!-- Carrinho no header -->
+      <button id="cartBtn" class="cart-btn" aria-label="Abrir carrinho" aria-haspopup="dialog">🛒
+        <span id="cartCount" class="cart-badge" aria-live="polite">0</span>
+      </button>
+      <button id="loginBtn" class="login-nav-btn">Entrar</button>
+      <!-- novo botão de menu do usuário -->
+      <button id="userMenuBtn" class="user-menu-btn hidden" aria-haspopup="dialog" aria-label="Abrir menu do usuário">☰</button>
+    </nav>
+  </header>
+
+  <!-- Modal de Login -->
+  <div id="loginModal" class="modal login-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="loginModalTitle">
+    <div class="modal-content login-modal-content" tabindex="-1">
+      <button id="closeLoginModal" class="modal-close-x" aria-label="Fechar modal">&times;</button>
+      <h2 id="loginModalTitle">🔐 Entrar na GameStore</h2>
+      <form id="loginForm" class="login-form">
+        <div class="form-group">
+          <label for="loginEmail">E-mail</label>
+          <input type="email" id="loginEmail" name="email" placeholder="seu@email.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Senha</label>
+          <input type="password" id="loginPassword" name="password" placeholder="Digite sua senha" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="login-submit-btn">Entrar</button>
+        <div id="loginMessage" class="login-message" role="status" aria-live="polite"></div>
+      </form>
+      <div class="login-footer">
+        <a href="#" class="forgot-password">Esqueceu sua senha?</a>
+  <p class="signup-link">Não tem conta? <a href="#" id="openRegisterLink">Cadastre-se</a></p>
+  <!-- Modal de Cadastro -->
+  <div id="registerModal" class="modal login-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="registerModalTitle">
+    <div class="modal-content login-modal-content" tabindex="-1">
+      <button id="closeRegisterModal" class="modal-close-x" aria-label="Fechar modal">&times;</button>
+      <h2 id="registerModalTitle">📝 Cadastre-se na GameStore</h2>
+      <form id="registerForm" class="login-form">
+        <div class="form-group">
+          <label for="registerUsername">Usuário *</label>
+          <input type="text" id="registerUsername" name="username" placeholder="Escolha um nome de usuário" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="registerEmail">E-mail *</label>
+          <input type="email" id="registerEmail" name="email" placeholder="seu@email.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="registerNome">Nome Completo</label>
+          <input type="text" id="registerNome" name="nome_completo" placeholder="Seu nome completo" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="registerPassword">Senha * (mínimo 6 caracteres)</label>
+          <input type="password" id="registerPassword" name="password" placeholder="Digite sua senha" required autocomplete="new-password" minlength="6">
+        </div>
+        <button type="submit" class="login-submit-btn">Cadastrar</button>
+        <div id="registerMessage" class="login-message" role="status" aria-live="polite"></div>
+      </form>
+      <div class="login-footer">
+        <p class="signup-link">Já tem conta? <a href="#" id="openLoginLink">Faça login</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal da Conta -->
+  <div id="accountModal" class="modal login-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="accountModalTitle">
+    <div class="modal-content login-modal-content" tabindex="-1">
+      <button id="closeAccountModal" class="modal-close-x" aria-label="Fechar modal">&times;</button>
+      <h2 id="accountModalTitle">👤 Minha Conta</h2>
+      <div class="account-info">
+        <p><strong>Nome:</strong> <span id="accName">—</span></p>
+        <p><strong>E-mail:</strong> <span id="accEmail">—</span></p>
+      </div>
+      <hr>
+      <div class="account-purchases">
+        <h3>🧾 Compras</h3>
+        <ul id="purchasesList" class="purchases-list">
+          <li class="muted">Sem compras registradas.</li>
+        </ul>
+      </div>
+      <div class="modal-actions" style="margin-top:18px;display:flex;gap:10px;justify-content:flex-end;">
+        <button id="logoutBtn" class="cancel-btn">Sair</button>
+        <button id="closeAccount" class="modal-close">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal do Perfil (novo) -->
+  <div id="profileModal" class="modal profile-modal no-scroll-lock" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="profileModalTitle">
+    <div class="modal-content" tabindex="-1">
+      <button id="closeProfileModal" class="modal-close-x" aria-label="Fechar modal">&times;</button>
+      <h2 id="profileModalTitle">👤 Perfil</h2>
+      <div class="account-info">
+        <p><strong>Nome:</strong> <span id="profileName">—</span></p>
+        <p><strong>E-mail:</strong> <span id="profileEmail">—</span></p>
+      </div>
+      <div class="modal-actions" style="margin-top:18px;display:flex;gap:10px;justify-content:flex-end;">
+        <button id="closeProfile" class="modal-close">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+      </div>
+    </div>
+  </div>
+
+
+
+ <section id="home" class="hero">
+    <div class="hero-content">
+      <h1>Bem-vindo à <span>GameStore</span></h1>
+      <p>Os melhores jogos digitais em um só lugar!</p>
+      <a href="#store" class="hero-btn">Explorar jogos</a>
+      
+      <!-- Trust/benefits bar -->
+      <div class="trust-bar" aria-label="Benefícios da loja">
+        <div class="trust-item">
+          <img src="https://www.advocacianunes.com.br/wp-content/uploads/2022/04/logo-pix-icone-1024.png" alt="Pix" class="trust-icon">
+          <div class="trust-text">
+            <div class="trust-title">5% DE DESCONTO</div>
+            <div class="trust-sub">via Pix</div>
+          </div>
+        </div>
+
+        <div class="trust-item">
+          <span class="trust-emoji" aria-hidden="true">🚚</span>
+          <div class="trust-text">
+            <div class="trust-title">FRETE GRÁTIS</div>
+            <div class="trust-sub">Envio por e-mail</div>
+          </div>
+        </div>
+
+        <div class="trust-item">
+          <span class="trust-emoji" aria-hidden="true" style="color:#22c55e">✅</span>
+          <div class="trust-text">
+            <div class="trust-title">SITE SEGURO</div>
+            <div class="trust-sub">Seus dados protegidos!</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Top played games of the year -->
+  <!-- Popular games of the week -->
+  <section id="popular" class="popular-section">
+    <div class="store-wrapper">
+      <h2>🎮 Jogos Populares da Semana</h2>
+      <div id="popularGamesContainer" class="popular-container">
+        <div class="loading">Carregando jogos populares...</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="top-played" class="top-played">
+    <div class="store-wrapper">
+      <h2>🔥 Mais jogados do ano</h2>
+      <div id="topPlayedContainer" class="top-played-container">
+        <!-- Top played cards injection -->
+        <div class="loading">Carregando os mais jogados...</div>
+      </div>
+    </div>
+  </section>
+<div class="results-banner">
+  🎮 <span id="resultsCount">20</span> resultados encontrados
+</div>
+  
+</section>
+
+  <!-- Support / Help -->
+ 
+
+  <section id="store" class="store">
+    <h2>🎮 Jogão por até 100zão! Se parcelar em 6x sem juros você nem sente!</h2>
+    <div class="store-wrapper">
+      <div class="store-main">
+        <div id="gamesContainer" class="games-container">
+          <!-- Games will be loaded dynamically -->
+          <div id="noResults" class="no-results" style="display:none;">Nenhum jogo encontrado.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game Pass section -->
+  <section id="gamepass" class="store">
+    <div class="store-wrapper">
+      <h2>Garanta já seu desconto no Gamepass, pague em 6x sem juros e garanta a melhor biblioteca de Games de todas!</h2>
+      <div id="gamepassContainer" class="games-container">
+        <!-- Game Pass cards dynamically -->
+      </div>
+    </div>
+  </section>
+
+        <!-- Checkout Flow Modal (detailed payment) -->
+        <div id="checkoutFlowModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="checkoutFlowTitle">
+          <div class="modal-content" tabindex="-1">
+            <h2 id="checkoutFlowTitle">Finalizar Compra</h2>
+            <form id="checkoutForm" class="checkout-form">
+              <label style="margin-top:10px">Forma de pagamento</label>
+              <div class="payment-list" role="radiogroup" aria-label="Formas de pagamento">
+                <label class="payment-option">
+                  <input type="radio" name="paymentMethod" value="pix">
+                  <span class="pay-label"><img src="https://www.advocacianunes.com.br/wp-content/uploads/2022/04/logo-pix-icone-1024.png" alt="Pix" class="pay-icon"> PIX</span>
+                </label>
+                <label class="payment-option">
+                  <input type="radio" name="paymentMethod" value="boleto">
+                  <span class="pay-label"><img src="https://www.escoteirossp.org.br/wp/wp-content/uploads/2014/06/Boleto-1.jpg" alt="Boleto" class="pay-icon"> Boleto</span>
+                </label>
+                <label class="payment-option">
+                  <input type="radio" name="paymentMethod" value="paypal">
+                  <span class="pay-label"><img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" alt="PayPal" class="pay-icon"> PayPal</span>
+                </label>
+                <label class="payment-option">
+                  <input type="radio" name="paymentMethod" value="credit-card">
+                  <span class="pay-label">💳 Cartão de crédito</span>
+                </label>
+                <label class="payment-option">
+                  <input type="radio" name="paymentMethod" value="picpay">
+                  <span class="pay-label"><img src="https://logodownload.org/wp-content/uploads/2019/10/picpay-logo-1.png" alt="PicPay" class="pay-icon"> PicPay</span>
+                </label>
+              </div>
+
+              <div class="coupon-row" aria-label="Cupom de desconto">
+                <label for="couponCode" class="visually-hidden">Cupom de desconto</label>
+                <input id="couponCode" name="cupom" type="text" placeholder="Possui um cupom de desconto?" autocomplete="off" />
+                <button type="button" id="applyCouponBtn" class="apply-coupon-btn">Aplicar</button>
+              </div>
+
+              <div id="checkoutMessage" style="margin-top:8px"></div>
+
+              <div class="modal-actions">
+                <button type="button" id="closeCheckoutFlow" class="cancel-btn">Fechar</button>
+                <button type="button" id="confirmCheckoutBtn" class="confirm-btn">Confirmar Compra</button>
+              </div>
+              <!-- Resumo do pedido (abaixo de finalizar compra) -->
+              <div id="orderSummary" class="order-summary" aria-live="polite"></div>
+            </form>
+            <div id="checkoutSuccess" class="checkout-success" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+
+
+
+   <section id="support" class="support">
+    <div class="support-inner">
+      <h2>💬 Suporte</h2>
+      <p class="support-desc">Precisa de ajuda com compras, login ou gift cards? Envie sua mensagem abaixo e nossa equipe entrará em contato.</p>
+
+      <form id="supportForm" class="support-form" novalidate aria-label="Formulário de suporte">
+        <div class="form-row">
+          <label for="supportName">Nome <span aria-hidden="true">*</span></label>
+          <input id="supportName" name="name" type="text" required aria-required="true" />
+          <div class="error-message" id="errName" aria-live="polite"></div>
+        </div>
+
+        <div class="form-row">
+          <label for="supportEmail">E-mail <span aria-hidden="true">*</span></label>
+          <input id="supportEmail" name="email" type="email" required aria-required="true" />
+          <div class="error-message" id="errEmail" aria-live="polite"></div>
+        </div>
+
+        <div class="form-row">
+          <label for="supportSubject">Assunto <span aria-hidden="true">*</span></label>
+          <input id="supportSubject" name="subject" type="text" required aria-required="true" />
+          <div class="error-message" id="errSubject" aria-live="polite"></div>
+        </div>
+
+        <div class="form-row">
+          <label for="supportMessage">Mensagem <span aria-hidden="true">*</span></label>
+          <textarea id="supportMessage" name="message" rows="5" required aria-required="true"></textarea>
+          <div class="error-message" id="errMessage" aria-live="polite"></div>
+        </div>
+
+        <div class="form-actions">
+          <button id="supportSubmit" class="buy-btn" type="submit">Enviar mensagem</button>
+          <div id="supportSuccess" class="success-message" role="status" aria-live="polite" style="display:none;">Mensagem enviada com sucesso!</div>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-contact">
+      <h3 style="margin:6px 0;color:#fbbf24">Atendimento</h3>
+      <p style="margin:4px 0">
+        <a href="mailto:suporteGameStore@email.com" style="color:#ddd;text-decoration:none">suporteGameStore@email.com</a>
+      </p>
+      <h3 style="margin:10px 0 4px;color:#fbbf24">Horário de atendimento</h3>
+      <p style="margin:0">10:30 às 16h</p>
+    </div>
+    <p style="margin-top:12px">© 2025 GameStore | Desenvolvido por João Paulo Martins</p>
+  </footer>
+
+  <div id="cookieAlert" class="cookie-alert" role="alert">
+    <div class="cookie-content">
+      <p>Nós usamos cookies! 🍪</p>
+      <p>Eles servem para melhorar a sua experiência. Ao usar nosso site, você está concordando com o uso de cookies.</p>
+      <div class="cookie-buttons">
+        <button id="acceptCookies" class="cookie-accept">Aceitar</button>
+        <a href="#" class="cookie-learn-more">Saiba mais</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chatbot widget (frontend-only) -->
+  <div id="chatbot" class="chatbot" aria-hidden="true">
+    <button id="chatbotToggle" class="chatbot-toggle" aria-label="Abrir chat — Mago, o assistente virtual">💬</button>
+    <div id="chatbotPanel" class="chatbot-panel" role="dialog" aria-label="Mago, o assistente virtual">
+      <div class="chatbot-header">
+        <div class="chatbot-identity">
+          <img class="chatbot-avatar" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjqCUvrIf6rJjXUCCNGf_vRz06lCfAFk4VXRKBmLfSq3DlpGJJR25vw2vzU_agi4X_r038WmN7wqL_t2WTb02gtSFqe2It-LRrCZx8A-Frrhyphenhyphen6ar14f-D8JdEEp3hhC-AP2vMGbQthSVDWU/s640-rw/mago.jpg" alt="Mago, o assistente virtual" />
+          <div>
+            <strong>Mago, o assistente virtual</strong>
+            <div class="chatbot-sub">Ajuda com compras e recomendações</div>
+          </div>
+        </div>
+        <div class="chatbot-actions">
+          <button id="chatbotMinimize" class="chatbot-icon" title="Minimizar">—</button>
+          <button id="chatbotClose" class="chatbot-icon" title="Fechar">✕</button>
+        </div>
+      </div>
+
+      <div id="chatbotMessages" class="chatbot-messages" aria-live="polite"></div>
+
+      <form id="chatbotForm" class="chatbot-form" aria-label="Enviar mensagem ao assistente">
+        <input id="chatbotInput" class="chatbot-input" type="text" placeholder="Escreva sua dúvida..." aria-label="Mensagem" autocomplete="off">
+        <button type="submit" class="chatbot-send">Enviar</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="scripts/chatbot.js"></script>
+  <script src="scripts/checkout.js"></script>
+  <script src="scripts/main.js"></script>
+</body>
+</html>
