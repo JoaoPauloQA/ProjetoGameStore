@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minha Conta - GameStore</title>
+  <link rel="stylesheet" href="styles/style.css">
+  <style>
+    :root{--bg:#0f172a;--panel:#121324;--muted:#9ca3af;--gold:#fbbf24;--gold-strong:#eab308;--accent:#00d4ff;--card:#111218;--glass:rgba(255,255,255,0.04);--transition:220ms cubic-bezier(.2,.9,.2,1)}
+    body{font-family:'Roboto',sans-serif;background-color:var(--bg);color:#fff;margin:0;padding:0;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+    .account-page{max-width:960px;margin:32px auto;padding:16px}
+    .account-card{background:#0f172a;border:1px solid #243045;border-radius:12px;padding:20px;box-shadow:0 6px 22px rgba(0,0,0,0.25)}
+    .account-title{font-size:22px;font-weight:700;margin:0 0 16px;color:#e2e8f0}
+    .account-header{display:flex;align-items:center;gap:16px;padding:8px 0 16px;border-bottom:1px solid #1e293b;margin-bottom:16px}
+    .account-avatar{width:88px;height:88px;border-radius:50%;object-fit:cover;box-shadow:0 10px 24px rgba(0,0,0,0.35);border:3px solid rgba(56,189,248,0.35);background:radial-gradient(ellipse at center,rgba(56,189,248,0.15),rgba(99,102,241,0.08))}
+    .account-meta{display:flex;flex-direction:column;gap:4px}
+    .account-name{font-size:20px;font-weight:800;color:#f1f5f9;letter-spacing:.3px}
+    .account-email{color:#93c5fd;font-weight:600}
+    .account-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px dashed #2a364d}
+    .account-row:last-child{border-bottom:0}
+    .label{color:#94a3b8;font-weight:600}
+    .value{color:#f8fafc;font-weight:700}
+    .muted{color:#94a3b8}
+    .topbar{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+    .topbar a{color:#38bdf8;text-decoration:none}
+    .topbar a:hover{text-decoration:underline}
+    .loading{text-align:center;padding:20px;color:var(--gold);animation:pulse 1.5s infinite}
+    @keyframes pulse{0%{opacity:.6}50%{opacity:1}100%{opacity:.6}}
+    
+    /* ========================================
+       ESTILOS PARA HISTÓRICO DE COMPRAS
+       ======================================== */
+    .history-section{margin-top:32px}
+    .history-title{font-size:20px;font-weight:700;margin:0 0 16px;color:#e2e8f0;display:flex;align-items:center;gap:8px}
+    .history-title::before{content:'🛒';font-size:22px}
+    .history-empty{text-align:center;padding:32px 20px;color:#64748b;font-size:15px;background:rgba(15,23,42,0.5);border-radius:8px;border:1px dashed #334155}
+    .order-card{background:linear-gradient(135deg,rgba(30,41,59,0.8),rgba(15,23,42,0.9));border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:16px;transition:all 0.3s ease}
+    .order-card:hover{border-color:#475569;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+    .order-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #1e293b}
+    .order-info{display:flex;flex-direction:column;gap:4px}
+    .order-id{font-size:13px;color:#94a3b8;font-weight:600}
+    .order-date{font-size:12px;color:#64748b}
+    .order-total{font-size:18px;font-weight:800;color:var(--gold);text-align:right}
+    .order-items{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+    .order-item{display:flex;align-items:center;gap:12px;padding:8px;background:rgba(15,23,42,0.6);border-radius:6px;border:1px solid #1e293b}
+    .order-item-img{width:50px;height:50px;object-fit:cover;border-radius:4px;border:1px solid #334155}
+    .order-item-info{flex:1;display:flex;flex-direction:column;gap:2px}
+    .order-item-title{font-size:14px;font-weight:600;color:#f1f5f9}
+    .order-item-details{font-size:12px;color:#94a3b8}
+    @media(max-width:640px){.order-header{flex-direction:column;align-items:flex-start;gap:8px}.order-total{text-align:left}}
+  </style>
+</head>
+<body>
+  <div class="account-page">
+    <div class="topbar">
+      <a href="index.html">← Voltar para a loja</a>
+    </div>
+    <div class="account-card">
+      <h1 class="account-title">Minha Conta</h1>
+      <div class="account-header">
+        <img class="account-avatar" id="accAvatar" alt="Avatar do usuário" src="https://thumbs.dreamstime.com/b/vetor-de-%C3%ADcone-perfil-do-avatar-padr%C3%A3o-foto-usu%C3%A1rio-m%C3%ADdia-social-183042379.jpg" loading="lazy" />
+        <div class="account-meta">
+          <div class="account-name" id="accNomeHeader">Carregando...</div>
+          <div class="account-email" id="accEmailHeader">Carregando...</div>
+        </div>
+      </div>
+      <div id="accountError" class="muted" style="display:none"></div>
+      <div class="account-row">
+        <div class="label">Nome</div>
+        <div class="value" id="accNome">Carregando...</div>
+      </div>
+      <div class="account-row">
+        <div class="label">Email</div>
+        <div class="value" id="accEmail">Carregando...</div>
+      </div>
+      <div class="account-row">
+        <div class="label">Data de entrada</div>
+        <div class="value" id="accCreated">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- ========================================
+         SEÇÃO DE HISTÓRICO DE COMPRAS
+         ======================================== -->
+    <div class="account-card history-section">
+      <h2 class="history-title">Histórico de Compras</h2>
+      <div id="ordersContainer">
+        <div class="loading">Carregando histórico de compras...</div>
+      </div>
+    </div>
+  </div>
+  <!-- Chatbot widget -->
+  <div id="chatbot" class="chatbot" aria-hidden="true">
+    <button id="chatbotToggle" class="chatbot-toggle" aria-label="Abrir chat — Mago, o assistente virtual">💬</button>
+    <div id="chatbotPanel" class="chatbot-panel" role="dialog" aria-label="Mago, o assistente virtual">
+      <div class="chatbot-header">
+        <div class="chatbot-identity">
+          <img class="chatbot-avatar" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjqCUvrIf6rJjXUCCNGf_vRz06lCfAFk4VXRKBmLfSq3DlpGJJR25vw2vzU_agi4X_r038WmN7wqL_t2WTb02gtSFqe2It-LRrCZx8A-Frrhyphenhyphen6ar14f-D8JdEEp3hhC-AP2vMGbQthSVDWU/s640-rw/mago.jpg" alt="Mago, o assistente virtual" />
+          <div>
+            <strong>Mago, o assistente virtual</strong>
+            <div class="chatbot-sub">Ajuda com compras e recomendações</div>
+          </div>
+        </div>
+        <div class="chatbot-actions">
+          <button id="chatbotMinimize" class="chatbot-icon" title="Minimizar">—</button>
+          <button id="chatbotClose" class="chatbot-icon" title="Fechar">✕</button>
+        </div>
+      </div>
+
+      <div id="chatbotMessages" class="chatbot-messages" aria-live="polite"></div>
+
+      <form id="chatbotForm" class="chatbot-form" aria-label="Enviar mensagem ao assistente">
+        <input id="chatbotInput" class="chatbot-input" type="text" placeholder="Escreva sua dúvida..." aria-label="Mensagem" autocomplete="off">
+        <button type="submit" class="chatbot-send">Enviar</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="scripts/chatbotIntents.js"></script>
+  <script src="scripts/chatbotCore.js"></script>
+  <script src="scripts/minha-conta.js" defer></script>
+</body>
+</html>

@@ -16,6 +16,14 @@ function escapeHtml(str){
   })[s]);
 }
 
+// Helper to check if user is logged in
+function isUserLoggedIn(){
+  try{
+    const userData = JSON.parse(sessionStorage.getItem('userData') || 'null');
+    return userData && userData.id;
+  }catch(_){ return false; }
+}
+
 function openModal(id){
   const el = document.getElementById(id);
   if(!el) return;
@@ -56,6 +64,26 @@ async function handleCheckout(gameId){
     console.error('Checkout error', err);
     const msgEl = document.getElementById('checkoutMessage');
     if(msgEl){ msgEl.textContent = '❌ Erro de conexão'; msgEl.className = 'checkout-message error'; }
+  }
+}
+
+// Load and display games count
+async function loadGamesCount(){
+  try{
+    const countEl = document.getElementById('resultsCount');
+    if(!countEl) return;
+    const res = await fetch(`${API_BASE}/games/count`);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const total = data.total || 0;
+    countEl.textContent = total;
+    // Update banner visibility
+    const banner = document.querySelector('.results-banner');
+    if(banner && total > 0){
+      banner.style.display = 'block';
+    }
+  }catch(err){
+    console.error('Erro ao carregar contagem de jogos', err);
   }
 }
 
@@ -197,7 +225,6 @@ async function loadPopularGames(){
             <img src="${g.background_image}" alt="${escapeHtml(g.name)}">
             <h3>${escapeHtml(g.name)}</h3>
             <p class="rating">⭐ ${Number(g.rating||0).toFixed(1)}</p>
-            <button class="buy-btn" data-game-id="${g.id}">Comprar</button>
           `;
           container.appendChild(card);
         });
@@ -212,7 +239,7 @@ async function loadPopularGames(){
   const filtered = (games || []).filter(g => !String(g.title || g.name || '').toLowerCase().includes('gamepass'));
   container.innerHTML = '';
   if(!filtered || filtered.length === 0){ container.innerHTML = '<div class="no-results">Nenhum jogo popular encontrado.</div>'; return; }
-  filtered.forEach(g => {
+    filtered.forEach(g => {
       const card = document.createElement('div');
       card.className = 'game-card popular-card';
       card.dataset.gameId = g.id;
@@ -220,7 +247,6 @@ async function loadPopularGames(){
         <img src="${g.background_image}" alt="${escapeHtml(g.name)}">
         <h3>${escapeHtml(g.name)}</h3>
         <p class="rating">⭐ ${g.rating.toFixed(1)}</p>
-        <button class="buy-btn" data-game-id="${g.id}">Comprar</button>
       `;
       container.appendChild(card);
     });
@@ -339,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
   try { localStorage.removeItem('loggedUser'); localStorage.removeItem('userData'); } catch(_) {}
 
   loadGames();
+  loadGamesCount(); // Atualiza o contador de jogos
   // load popular games section (RAWG)
   loadPopularGames();
   // load Game Pass products from DB
@@ -569,29 +596,28 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear form fields
         supportForm.reset();
 
-        // Open chatbot and show auto-message
-        const chatbot = document.getElementById('chatbot');
-        const chatbotPanel = document.getElementById('chatbotPanel');
-        const chatbotToggle = document.getElementById('chatbotToggle');
-        const messagesContainer = document.getElementById('chatbotMessages');
-
-        if(chatbotPanel){
-          chatbotPanel.setAttribute('aria-hidden', 'false');
+        // Open chatbot using exported function and push message
+        if(window.openChatWidget){
+          window.openChatWidget();
+        } else {
+          // fallback minimal open
+          const chatbotPanel = document.getElementById('chatbotPanel');
+          const chatbot = document.getElementById('chatbot');
+          if(chatbotPanel) chatbotPanel.setAttribute('aria-hidden','false');
+          if(chatbot) chatbot.setAttribute('aria-hidden','false');
         }
-        if(chatbot){
-          chatbot.setAttribute('aria-hidden', 'false');
-        }
-        if(chatbotToggle){
-          chatbotToggle.style.display = 'none'; // hide toggle button when open
-        }
-
-        // Add bot auto-message with protocol
-        if(messagesContainer){
-          const botMsg = document.createElement('div');
-          botMsg.className = 'msg bot';
-          botMsg.textContent = `✅ Seu ticket foi aberto com sucesso! Protocolo: ${protocolo}. Em breve nossa equipe entrará em contato.`;
-          messagesContainer.appendChild(botMsg);
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        const text = `✅ Seu ticket foi aberto com sucesso! Protocolo: ${protocolo}. Em breve nossa equipe entrará em contato.`;
+        if(window.pushMessage){
+          window.pushMessage(text, 'bot');
+        } else {
+          const messagesContainer = document.getElementById('chatbotMessages');
+          if(messagesContainer){
+            const botMsg = document.createElement('div');
+            botMsg.className = 'msg bot';
+            botMsg.textContent = text;
+            messagesContainer.appendChild(botMsg);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
         }
       }catch(err){
         console.error('Erro ao enviar ticket', err);
@@ -603,8 +629,44 @@ document.addEventListener('DOMContentLoaded', () => {
   // Cookie alert (keep simple)
   const accept = document.getElementById('acceptCookies');
   const cookieAlert = document.getElementById('cookieAlert');
-  if(accept){ accept.addEventListener('click', () => { localStorage.setItem('cookiesAccepted','true'); if(cookieAlert) cookieAlert.style.display = 'none'; }); }
-  if(!localStorage.getItem('cookiesAccepted') && cookieAlert){ setTimeout(()=> cookieAlert.style.display = 'block', 2000); }
+  const cookieLearnMore = document.getElementById('cookieLearnMore');
+  const cookieInfoModal = document.getElementById('cookieInfoModal');
+  const closeCookieInfo = document.getElementById('closeCookieInfo');
+  const closeCookieInfoBtn = document.getElementById('closeCookieInfoBtn');
+  
+  if(accept){ 
+    accept.addEventListener('click', () => { 
+      localStorage.setItem('cookiesAccepted','true'); 
+      if(cookieAlert) cookieAlert.style.display = 'none'; 
+    }); 
+  }
+  
+  if(cookieLearnMore){
+    cookieLearnMore.addEventListener('click', (e) => {
+      e.preventDefault();
+      openModal('cookieInfoModal');
+    });
+  }
+  
+  if(closeCookieInfo){
+    closeCookieInfo.addEventListener('click', () => closeModal('cookieInfoModal'));
+  }
+  
+  if(closeCookieInfoBtn){
+    closeCookieInfoBtn.addEventListener('click', () => closeModal('cookieInfoModal'));
+  }
+  
+  if(cookieInfoModal){
+    cookieInfoModal.addEventListener('click', (e) => {
+      if(e.target === cookieInfoModal){
+        closeModal('cookieInfoModal');
+      }
+    });
+  }
+  
+  if(!localStorage.getItem('cookiesAccepted') && cookieAlert){ 
+    setTimeout(()=> cookieAlert.style.display = 'block', 2000); 
+  }
 
   // ========================================
   // MODAL DE LOGIN
@@ -624,17 +686,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const purchasesList = document.getElementById('purchasesList');
 
   // Abrir modal
+  const userDropdown = document.getElementById('userDropdown');
+  const udAccount = document.getElementById('udAccount');
+  const udLogout = document.getElementById('udLogout');
+
+  function toggleUserDropdown(anchor){
+    if(!userDropdown || !anchor) return;
+    const hidden = userDropdown.classList.contains('hidden');
+    if(hidden){
+      // position near the anchor
+      const rect = anchor.getBoundingClientRect();
+      // place dropdown below the anchor (viewport coords; position: fixed)
+      userDropdown.style.top = Math.round(rect.bottom + 8) + 'px';
+      userDropdown.style.right = Math.round(window.innerWidth - rect.right - 18) + 'px';
+      userDropdown.classList.remove('hidden');
+      userDropdown.setAttribute('aria-hidden','false');
+    } else {
+      userDropdown.classList.add('hidden');
+      userDropdown.setAttribute('aria-hidden','true');
+    }
+  }
+
   if(loginBtn){
     loginBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       const userData = JSON.parse(sessionStorage.getItem('userData') || 'null');
       if(userData && userData.id){
-        // Abre modal imediatamente e carrega dados com cache/guard
-        openModal('accountModal');
-        await loadAccount(userData.id);
+        // Usuário logado: abre dropdown com opções (Minha conta / Sair)
+        toggleUserDropdown(loginBtn);
       } else {
-        // Não logado: abre modal de login
-        openModal('loginModal');
+        // Novo fluxo: redireciona para a página de login
+        window.location.href = 'login.html';
       }
     });
   }
@@ -705,9 +787,19 @@ document.addEventListener('DOMContentLoaded', () => {
             loginMessage.className = 'login-message success';
           }
 
-          // Salva os dados do usuário na sessão (sessionStorage)
+          // Salva o TOKEN JWT e os dados do usuário na sessão
+          sessionStorage.setItem('token', data.token); // NOVO: Token JWT
           sessionStorage.setItem('loggedUser', data.user.username || data.user.email);
           sessionStorage.setItem('userData', JSON.stringify(data.user));
+
+          // Se estiver na página de login, redireciona para a loja
+          try{
+            const path = (window.location.pathname || '').toLowerCase();
+            if(path.endsWith('/login.html') || path.endsWith('login.html')){
+              window.location.href = 'index.html';
+              return; // evita executar o restante (fechar modal etc.)
+            }
+          }catch(_e){}
 
           // Fecha o modal após 1.5s
           setTimeout(() => {
@@ -767,13 +859,51 @@ document.addEventListener('DOMContentLoaded', () => {
     logoutBtn.addEventListener('click', () => {
       sessionStorage.removeItem('loggedUser');
       sessionStorage.removeItem('userData');
+      sessionStorage.removeItem('token'); // NOVO: Remove o token JWT
       if(loginBtn){ loginBtn.textContent = 'Entrar'; }
       if(userMenuBtn){ userMenuBtn.classList.add('hidden'); }
       // Garante que qualquer popout de perfil também seja fechado
       closeModal('profileModal');
       closeModal('accountModal');
+      if(userDropdown){ userDropdown.classList.add('hidden'); userDropdown.setAttribute('aria-hidden','true'); }
     });
   }
+
+  // Dropdown actions
+  if(udAccount){
+    udAccount.addEventListener('click', () => {
+      if(userDropdown){ userDropdown.classList.add('hidden'); userDropdown.setAttribute('aria-hidden','true'); }
+      const userData = JSON.parse(sessionStorage.getItem('userData') || 'null');
+      if(userData && userData.id){
+        // Redireciona para a página Minha Conta
+        window.location.href = 'minha-conta.html';
+      } else {
+        // Sem sessão: redireciona para login
+        window.location.href = 'login.html';
+      }
+    });
+  }
+  if(udLogout){
+    udLogout.addEventListener('click', () => {
+      // Reutiliza o botão de logout da modal de conta se existir, senão executa inline
+      if(logoutBtn){ logoutBtn.click(); }
+      else {
+        sessionStorage.removeItem('loggedUser');
+        sessionStorage.removeItem('userData');
+        sessionStorage.removeItem('token'); // NOVO: Remove o token JWT
+        if(loginBtn){ loginBtn.textContent = 'Entrar'; }
+        if(userMenuBtn){ userMenuBtn.classList.add('hidden'); }
+        if(userDropdown){ userDropdown.classList.add('hidden'); userDropdown.setAttribute('aria-hidden','true'); }
+      }
+    });
+  }
+
+  // Fecha dropdown ao clicar fora
+  window.addEventListener('click', (evt) => {
+    if(!userDropdown || userDropdown.classList.contains('hidden')) return;
+    const within = userDropdown.contains(evt.target) || (loginBtn && loginBtn.contains(evt.target));
+    if(!within){ userDropdown.classList.add('hidden'); userDropdown.setAttribute('aria-hidden','true'); }
+  });
 
   // Cache e guard para evitar fetch múltiplo e travamentos
   const ACCOUNT_CACHE_TTL = 10000; // 10s
@@ -844,14 +974,41 @@ document.addEventListener('DOMContentLoaded', () => {
   const registerMessage = document.getElementById('registerMessage');
   const openRegisterLink = document.getElementById('openRegisterLink');
   const openLoginLink = document.getElementById('openLoginLink');
+  const forgotPasswordLinks = document.querySelectorAll('.forgot-password');
+
+  // Esqueceu sua senha? -> abre chatbot e inicia fluxo guiado
+  if(forgotPasswordLinks && forgotPasswordLinks.length){
+    forgotPasswordLinks.forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Impede que o clique borbulhe até o listener global de "outside click"
+        // do chatbot, que fecharia o painel se estivesse aberto.
+        e.stopPropagation();
+        try{
+          if(window.startPasswordRecovery){
+            window.startPasswordRecovery();
+          } else if(window.openChatWidget){
+            window.openChatWidget();
+            if(window.pushMessage){
+              window.pushMessage('🔒 Vamos recuperar sua senha. Informe seus dados para recuperação:', 'bot');
+              window.pushMessage('Nome:', 'bot');
+            }
+          }
+        }catch(_e){}
+      });
+    });
+  }
 
   // Abrir modal de cadastro a partir do link no login
   if(openRegisterLink){
     openRegisterLink.addEventListener('click', (e) => {
       e.preventDefault();
-      closeModal('loginModal');
+      // Abra o cadastro imediatamente e feche o login em seguida para evitar "piscar" ou fechamento incorreto
+      openModal('registerModal');
       if(loginForm) loginForm.reset();
-      setTimeout(() => openModal('registerModal'), 300);
+      closeModal('loginModal');
+      // foca no primeiro campo do cadastro
+      setTimeout(() => document.getElementById('registerUsername')?.focus(), 50);
     });
   }
 
@@ -859,9 +1016,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if(openLoginLink){
     openLoginLink.addEventListener('click', (e) => {
       e.preventDefault();
-      closeModal('registerModal');
+      openModal('loginModal');
       if(registerForm) registerForm.reset();
-      setTimeout(() => openModal('loginModal'), 300);
+      closeModal('registerModal');
+      setTimeout(() => document.getElementById('loginEmail')?.focus(), 50);
     });
   }
 
@@ -874,6 +1032,13 @@ document.addEventListener('DOMContentLoaded', () => {
         registerMessage.textContent = '';
         registerMessage.className = 'login-message';
       }
+      // Se estiver na página de login, redireciona para a página inicial ao fechar o cadastro
+      try{
+        const path = (window.location.pathname || '').toLowerCase();
+        if(path.endsWith('/login.html') || path.endsWith('login.html')){
+          window.location.href = 'index.html';
+        }
+      }catch(_e){}
     });
   }
 
@@ -887,6 +1052,13 @@ document.addEventListener('DOMContentLoaded', () => {
           registerMessage.textContent = '';
           registerMessage.className = 'login-message';
         }
+        // Se estiver na página de login, redireciona para a página inicial ao fechar o cadastro clicando fora
+        try{
+          const path = (window.location.pathname || '').toLowerCase();
+          if(path.endsWith('/login.html') || path.endsWith('login.html')){
+            window.location.href = 'index.html';
+          }
+        }catch(_e){}
       }
     });
   }
@@ -928,25 +1100,36 @@ document.addEventListener('DOMContentLoaded', () => {
         if(response.ok && data.success){
           // Cadastro bem-sucedido
           if(registerMessage){
-            registerMessage.textContent = '✅ ' + data.message + ' Redirecionando para login...';
+            registerMessage.textContent = '✅ ' + data.message;
             registerMessage.className = 'login-message success';
           }
+          
+          // NOVO: Salva automaticamente o token JWT e faz login automático
+          sessionStorage.setItem('token', data.token);
+          sessionStorage.setItem('loggedUser', data.user.username || data.user.email);
+          sessionStorage.setItem('userData', JSON.stringify(data.user));
+          
           if(userMenuBtn){ userMenuBtn.classList.remove('hidden'); }
+          if(loginBtn){
+            const label = data.user.nome_completo || data.user.username || data.user.email;
+            loginBtn.textContent = `👤 ${label}`;
+          }
+          // Redireciona para a página inicial se estiver na tela de login
+          try{
+            const path = (window.location.pathname || '').toLowerCase();
+            if(path.endsWith('/login.html') || path.endsWith('login.html')){
+              window.location.href = 'index.html';
+              return;
+            }
+          }catch(_e){}
 
-          // Fecha o modal de cadastro e abre o de login após 2s
+          // Fallback: se não estiver em login.html, apenas fecha após 2s
           setTimeout(() => {
             closeModal('registerModal');
             if(registerForm) registerForm.reset();
             if(registerMessage) {
               registerMessage.textContent = '';
               registerMessage.className = 'login-message';
-            }
-            
-            // Abre o modal de login
-            openModal('loginModal');
-            // Pre-preenche o username (se existir campo de username no login)
-            if(document.getElementById('loginUsername')){
-              document.getElementById('loginUsername').value = username;
             }
           }, 2000);
         } else {
@@ -983,7 +1166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal('profileModal');
       } else {
         // sem sessão: redireciona para login
-        openModal('loginModal');
+        window.location.href = 'login.html';
       }
     });
   }
@@ -1062,11 +1245,17 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Seu carrinho está vazio. Adicione um produto antes de finalizar.');
         return;
       }
-      // abrir fluxo de checkout e fechar carrinho
+      // verificar se o usuário está logado
+      if(!isUserLoggedIn()){
+        alert('Você precisa estar logado para finalizar a compra.');
+        closeModal('cartModal');
+        window.location.href = 'login.html';
+        return;
+      }
+      // redirecionar para página de checkout e fechar carrinho
       closeModal('cartModal');
-      // opcionalmente limpar gameId único; vamos indicar que é compra de múltiplos
       window.selectedGameId = undefined;
-      if(window.abrirCheckout){ window.abrirCheckout(); }
+      window.location.href = 'checkout.html';
     });
   }
   if(list){

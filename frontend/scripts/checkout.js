@@ -14,10 +14,33 @@
 
   if(!modal || !form) return;
 
+  // Guard: se estiver na página de checkout e não logado, redireciona para login
+  try{
+    const userData = JSON.parse(sessionStorage.getItem('userData') || 'null');
+    if((window.location.pathname || '').toLowerCase().endsWith('checkout.html') && (!userData || !userData.id)){
+      alert('Você precisa estar logado para finalizar a compra.');
+      window.location.href = 'login.html';
+      return;
+    }
+  }catch(_e){}
+
+  // Renderiza o resumo imediatamente na página dedicada
+  if(orderSummary){
+    try{ renderOrderSummary(); }catch(_e){}
+  }
+
   let selectedPayment = null;
   let appliedCoupon = '';
 
   function openModal(){
+    // Verificar se o usuário está logado antes de abrir o checkout
+    const userData = JSON.parse(sessionStorage.getItem('userData') || 'null');
+    if(!userData || !userData.id){
+      alert('Você precisa estar logado para finalizar a compra.');
+      // novo fluxo: redireciona para a página de login
+      window.location.href = 'login.html';
+      return;
+    }
     modal.classList.add(openClass);
     modal.setAttribute('aria-hidden','false');
     document.body.style.overflow = 'hidden';
@@ -69,28 +92,128 @@
       return;
     }
 
-    // prepare payload (simplificado); include selected game id if available
+    // ========================================
+    // PREPARA PAYLOAD COM CARRINHO COMPLETO
+    // ========================================
+    // Busca token JWT para autenticação
+    const token = sessionStorage.getItem('token');
+    if(!token){
+      msgEl.innerHTML = '<div style="color:#ffb4b4;font-weight:700">❌ Você precisa estar logado para finalizar a compra.</div>';
+      setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+      return;
+    }
+
+    // Monta o payload com carrinho completo
     const payload = { formaPagamento };
     if(appliedCoupon) payload.cupom = appliedCoupon;
-    if(window.selectedGameId) payload.gameId = window.selectedGameId;
+    
+    // Inclui o carrinho completo do sessionStorage
+    const cart = _getCart();
+    if(Array.isArray(cart) && cart.length > 0){
+      payload.cart = cart;
+      console.log('Enviando carrinho com', cart.length, 'item(ns)');
+    } else if(window.selectedGameId) {
+      // Fallback: compra individual (fluxo legado)
+      payload.gameId = window.selectedGameId;
+      console.log('Enviando compra individual (ID:', window.selectedGameId, ')');
+    }
 
     try{
       confirmBtn.disabled = true;
       msgEl.innerHTML = '<div style="color:#00bfff">Processando compra...</div>';
-      const res = await fetch(`${API_BASE}/checkout`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      const data = await res.json();
+      
+      // Log para debug
+      console.log('[CHECKOUT] Iniciando compra...');
+      console.log('[CHECKOUT] Token existe:', !!token);
+      console.log('[CHECKOUT] Payload:', JSON.stringify(payload, null, 2));
+      
+      // ========================================
+      // ENVIA REQUISIÇÃO COM TOKEN JWT
+      // ========================================
+      const res = await fetch(`${API_BASE}/checkout`, { 
+        method:'POST', 
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization': `Bearer ${token}` // NOVO: Envia token JWT
+        }, 
+        body: JSON.stringify(payload) 
+      });
+      
+      console.log('[CHECKOUT] Status da resposta:', res.status);
+      
+      // Tenta fazer parse do JSON
+      let data;
+      try {
+        data = await res.json();
+        console.log('[CHECKOUT] Resposta do servidor:', data);
+      } catch (parseError) {
+        console.error('[CHECKOUT] Erro ao fazer parse da resposta:', parseError);
+        msgEl.innerHTML = '<div style="color:#ffb4b4;font-weight:700">❌ Erro na resposta do servidor. Verifique se o backend está rodando.</div>';
+        return;
+      }
+      
+      // Tratamento de sucesso
       if(res.ok && (data.sucesso || data.success)){
         successEl.textContent = `✅ Compra realizada com sucesso! Protocolo: ${data.protocolo}.`;
         successEl.classList.add('show');
         msgEl.innerHTML = '<div style="color:#bfffc1">Um e-mail com os detalhes da compra será enviado para você 📩</div>';
-        // auto-close after 3s
-        setTimeout(()=>{ closeModal(); }, 3000);
-      } else {
-        msgEl.innerHTML = `<div style=\"color:#ffb4b4;font-weight:700\">❌ ${data.mensagem || data.message || 'Erro ao processar compra.'}</div>`;
+
+        // LIMPA O CARRINHO após compra bem-sucedida
+        sessionStorage.removeItem('cart');
+        console.log('[CHECKOUT] Carrinho limpo após compra bem-sucedida');
+
+        // Abre chatbot e envia mensagem de confirmação
+        try{
+          if(typeof window.openChatWidget === 'function'){
+            window.openChatWidget();
+          }
+          if(typeof window.pushMessage === 'function'){
+            const proto = data.protocolo || data.protocol || '#';
+            window.pushMessage(`✅ Compra realizada com sucesso! Protocolo: ${proto}.`, 'bot', 'success');
+            window.pushMessage('Siga as instruções no seu e-mail cadastrado!', 'bot', 'notice');
+          }
+        }catch(_e){ /* ignore chatbot errors */ }
+
+        // Auto-fecha modal após 3s
+        setTimeout(()=>{ 
+          closeModal();
+          // Atualiza contador do carrinho se existir
+          if(typeof window.updateCartCount === 'function'){
+            window.updateCartCount();
+          }
+        }, 3000);
+      } 
+      // Tratamento de erro de autenticação
+      else if(res.status === 401){
+        console.error('[CHECKOUT] Erro 401 - Não autorizado');
+        msgEl.innerHTML = '<div style="color:#ffb4b4;font-weight:700">❌ Sessão expirada. Faça login novamente.</div>';
+        setTimeout(() => { 
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('userData');
+          window.location.href = 'login.html'; 
+        }, 2000);
+      }
+      // Erro 400 - Bad Request
+      else if(res.status === 400){
+        console.error('[CHECKOUT] Erro 400 - Requisição inválida:', data);
+        const errorMsg = data.mensagem || data.message || data.error || 'Dados inválidos';
+        msgEl.innerHTML = `<div style="color:#ffb4b4;font-weight:700">❌ ${errorMsg}</div>`;
+      }
+      // Erro 500 - Erro interno do servidor
+      else if(res.status === 500){
+        console.error('[CHECKOUT] Erro 500 - Erro no servidor:', data);
+        const errorMsg = data.mensagem || data.message || data.error || 'Erro no servidor';
+        msgEl.innerHTML = `<div style="color:#ffb4b4;font-weight:700">❌ ${errorMsg}</div>`;
+        msgEl.innerHTML += '<div style="color:#94a3b8;font-size:12px;margin-top:8px">Verifique se as tabelas do banco foram criadas corretamente.</div>';
+      }
+      // Outros erros
+      else {
+        console.error('[CHECKOUT] Erro desconhecido:', res.status, data);
+        msgEl.innerHTML = `<div style="color:#ffb4b4;font-weight:700">❌ ${data.mensagem || data.message || data.error || 'Erro ao processar compra.'}</div>`;
       }
     }catch(err){
-      console.error('checkout error', err);
-      msgEl.innerHTML = '<div style="color:#ffb4b4;font-weight:700">❌ Erro ao processar compra. Tente novamente.</div>';
+      console.error('[CHECKOUT] Exceção durante checkout:', err);
+      msgEl.innerHTML = '<div style="color:#ffb4b4;font-weight:700">❌ Erro de conexão. Verifique se o servidor está rodando.</div>';
     }finally{
       confirmBtn.disabled = false;
     }

@@ -12,8 +12,22 @@
 
   let minimized = false;
   let userInMenu = false; // track if user is in the menu system
+  // Password recovery flow state
+  const recovery = {
+    active: false,
+    step: 0, // 0=idle,1=awaiting name,2=awaiting email
+    name: '',
+    email: ''
+  };
 
   function openChat(){
+    // Se estava minimizado, restaura primeiro
+    if(minimized){
+      minimized = false;
+      panel.style.height = '';
+      panel.querySelector('.chatbot-messages').style.display = '';
+      panel.querySelector('.chatbot-form').style.display = '';
+    }
     panel.setAttribute('aria-hidden', 'false');
     document.getElementById('chatbot').setAttribute('aria-hidden','false');
     // Add fade-in animation
@@ -24,6 +38,11 @@
   function closeChat(){
     panel.setAttribute('aria-hidden', 'true');
     document.getElementById('chatbot').setAttribute('aria-hidden','true');
+    // Reset minimized state when closing
+    minimized = false;
+    panel.style.height = '';
+    panel.querySelector('.chatbot-messages').style.display = '';
+    panel.querySelector('.chatbot-form').style.display = '';
   }
 
   function toggleChat(){
@@ -37,13 +56,16 @@
   });
 
   closeBtn.addEventListener('click', () => closeChat());
+  
   minimizeBtn.addEventListener('click', () => {
     minimized = !minimized;
     if(minimized){
+      // Apenas minimiza visualmente, mas mantém o chatbot "aberto" (aria-hidden = false)
       panel.style.height = '56px';
       panel.querySelector('.chatbot-messages').style.display = 'none';
       panel.querySelector('.chatbot-form').style.display = 'none';
     } else {
+      // Restaura o tamanho completo
       panel.style.height = '';
       panel.querySelector('.chatbot-messages').style.display = '';
       panel.querySelector('.chatbot-form').style.display = '';
@@ -51,9 +73,10 @@
   });
 
   // helper to add messages - EXPORTED GLOBALLY
-  function pushMessage(text, who='bot'){
+  function pushMessage(text, who='bot', extraClass=''){
     const el = document.createElement('div');
-    el.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
+    const base = (who === 'user' ? 'user' : 'bot');
+    el.className = 'msg ' + base + (extraClass ? (' ' + extraClass) : '');
     el.textContent = text;
     messages.appendChild(el);
     messages.scrollTop = messages.scrollHeight;
@@ -61,6 +84,22 @@
 
   // Export pushMessage globally for main.js integration
   window.pushMessage = pushMessage;
+  // Export open/close for external triggers (e.g., support form)
+  window.openChatWidget = openChat;
+  window.closeChatWidget = closeChat;
+  // Start a guided password recovery flow (exported)
+  function startPasswordRecovery(){
+    openChat();
+    recovery.active = true;
+    recovery.step = 1;
+    recovery.name = '';
+    recovery.email = '';
+    userInMenu = false; // suspend menu during flow
+    pushMessage('🔒 Vamos recuperar sua senha. Informe seus dados para recuperação:', 'bot');
+    pushMessage('Nome:', 'bot');
+    input.focus();
+  }
+  window.startPasswordRecovery = startPasswordRecovery;
 
   // Display the main menu
   function showMainMenu(){
@@ -123,6 +162,31 @@
     if(!value) return;
     pushMessage(value, 'user');
     input.value = '';
+    // Handle password recovery flow if active
+    if(recovery.active){
+      if(recovery.step === 1){
+        recovery.name = value;
+        recovery.step = 2;
+        setTimeout(() => { pushMessage('Email:', 'bot'); }, 300);
+        return;
+      }
+      if(recovery.step === 2){
+        const email = value.trim();
+        const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        if(!ok){
+          setTimeout(() => { pushMessage('⚠️ Email inválido. Tente novamente.\nEmail:', 'bot'); }, 250);
+          return;
+        }
+        recovery.email = email;
+        recovery.active = false;
+        recovery.step = 0;
+        setTimeout(() => {
+          pushMessage('✅ Dados recebidos. Verifique seu e-mail e siga as instruções para recuperar sua senha.', 'bot', 'success');
+          setTimeout(() => { showMainMenu(); }, 800);
+        }, 400);
+        return;
+      }
+    }
     // simulate thinking
     setTimeout(() => botReply(value), 700 + Math.random()*800);
   });
@@ -138,7 +202,27 @@
 
       // Send welcome message after a short delay
       setTimeout(() => {
-        pushMessage('👋 Olá! Eu sou Mago, o assistente virtual. Como posso ajudar hoje?', 'bot');
+        // Context-aware greeting by page
+        const path = (window.location.pathname || '').toLowerCase();
+        const page = path.split('/').pop() || '';
+        const ctx = (() => {
+          if(page.includes('checkout')){
+            return '🧾 Vejo que você está no checkout. Posso ajudar com formas de pagamento, cupons ou detalhes da entrega por e-mail.';
+          }
+          if(page.includes('login')){
+            return '🔐 Bem-vindo à área de login. Precisa de ajuda para entrar ou criar sua conta? Posso orientar o cadastro.';
+          }
+          if(page.includes('minha-conta') || page.includes('minha_conta') || page.includes('conta')){
+            return '👤 Esta é sua página de conta. Posso ajudar a revisar seus dados ou localizar suas últimas compras.';
+          }
+          return null;
+        })();
+
+        if(ctx){
+          pushMessage(ctx, 'bot');
+        } else {
+          pushMessage('👋 Olá! Eu sou Mago, o assistente virtual. Como posso ajudar hoje?', 'bot');
+        }
       }, 500);
 
       // Show menu after welcome

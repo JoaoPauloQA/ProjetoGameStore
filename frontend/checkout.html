@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finalizar Compra — GameStore</title>
+  <link rel="stylesheet" href="styles/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="header">
+    <div class="logo">
+      <img src="https://png.pngtree.com/thumb_back/fh260/background/20240913/pngtree-blue-neon-game-controller-stock-photo-image_16181185.jpg" alt="Logo da GameStore" class="logo-img">
+      <span>GameStore</span>
+    </div>
+    <nav id="main-nav" class="navbar" aria-label="Navegação principal">
+      <a href="index.html" class="navbar-link">Voltar para a loja</a>
+      <button id="loginBtn" class="login-nav-btn">Entrar</button>
+      
+      <div id="userDropdown" class="user-dropdown hidden" role="menu" aria-hidden="true">
+        <button id="udAccount" class="ud-item" role="menuitem">Minha conta</button>
+        <button id="udLogout" class="ud-item danger" role="menuitem">Sair</button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Página de Checkout (reaproveita IDs do fluxo) -->
+  <main class="checkout-page" style="padding:30px 18px">
+    <div class="store-wrapper">
+      <h1 style="margin:0 0 16px;color:var(--gold)">Finalizar Compra</h1>
+      <p style="margin:0 0 24px;color:var(--muted)">Revise suas informações e selecione a forma de pagamento para concluir sua compra.</p>
+
+      <section id="checkoutFlowModal" aria-label="Checkout">
+        <div class="checkout-layout">
+          <!-- Coluna esquerda: Produto e resumo -->
+          <div class="checkout-col">
+            <div id="checkoutProductsList" class="product-list"></div>
+
+            <div class="seller-card">
+              <div class="seller-avatar">🛍️</div>
+              <div class="seller-info">
+                <div class="seller-name">GameStore Oficial</div>
+                <div class="seller-sub">Loja verificada • Envio imediato</div>
+              </div>
+            </div>
+
+            <!-- Informações importantes abaixo do bloco do vendedor -->
+            <div class="checkout-important" aria-label="Informações importantes">
+              <div class="important-icon">ℹ️</div>
+              <div class="important-text">
+                <p>Todos os itens são entregues apenas de forma digital por download ou créditos direto na conta e estão sujeitos à política de reembolso.</p>
+                <p>Verifique os requisitos de sistema na página de cada jogo e os Termos de Uso antes de realizar a compra.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coluna direita: Pagamento e Resumo -->
+          <div class="checkout-col">
+            <form id="checkoutForm" class="checkout-form" autocomplete="off">
+              <h3 style="margin:0 0 10px">Forma de pagamento</h3>
+              <div class="payment-list" role="radiogroup" aria-label="Formas de pagamento">
+                <label class="payment-option">
+                  <input type="radio" name="paymentMethod" value="pix">
+                  <span class="pay-label"><img src="https://www.advocacianunes.com.br/wp-content/uploads/2022/04/logo-pix-icone-1024.png" alt="Pix" class="pay-icon"> PIX</span>
+                </label>
+                <label class="payment-option">
+                  <input type="radio" name="paymentMethod" value="boleto">
+                  <span class="pay-label"><img src="https://www.escoteirossp.org.br/wp/wp-content/uploads/2014/06/Boleto-1.jpg" alt="Boleto" class="pay-icon"> Boleto</span>
+                </label>
+                <label class="payment-option">
+                  <input type="radio" name="paymentMethod" value="paypal">
+                  <span class="pay-label"><img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" alt="PayPal" class="pay-icon"> PayPal</span>
+                </label>
+                <label class="payment-option">
+                  <input type="radio" name="paymentMethod" value="credit-card">
+                  <span class="pay-label">💳 Cartão de crédito</span>
+                </label>
+                <label class="payment-option">
+                  <input type="radio" name="paymentMethod" value="picpay">
+                  <span class="pay-label"><img src="https://logodownload.org/wp-content/uploads/2019/10/picpay-logo-1.png" alt="PicPay" class="pay-icon"> PicPay</span>
+                </label>
+              </div>
+
+              <div class="coupon-row" aria-label="Cupom de desconto">
+                <input id="couponCode" name="cupom" type="text" placeholder="Possui um cupom de desconto?" autocomplete="off" />
+                <button type="button" id="applyCouponBtn" class="apply-coupon-btn">Aplicar</button>
+              </div>
+
+              <div id="checkoutMessage" class="checkout-message" role="status" aria-live="polite" style="display:none"></div>
+
+              <div class="checkout-actions">
+                <button type="button" id="closeCheckoutFlow" class="cancel-btn">Voltar</button>
+                <button type="button" id="confirmCheckoutBtn" class="confirm-btn">Confirmar Compra</button>
+              </div>
+
+              <div class="summary-card">
+                <div class="summary-header">
+                  <div class="summary-title">Resumo do pedido</div>
+                  <div id="selectedPaymentLabel" class="selected-payment">Pagamento: <span class="pill">—</span></div>
+                </div>
+                <div id="orderSummary" class="order-summary" aria-live="polite"></div>
+              </div>
+              <div id="checkoutSuccess" class="checkout-success" role="status" aria-live="polite"></div>
+            </form>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <p style="margin: 16px 0; color:#ccc">© 2025 GameStore</p>
+  </footer>
+
+  <!-- Chatbot widget (same structure as index.html) -->
+  <div id="chatbot" class="chatbot" aria-hidden="true">
+    <button id="chatbotToggle" class="chatbot-toggle" aria-label="Abrir chat — Mago, o assistente virtual">💬</button>
+    <div id="chatbotPanel" class="chatbot-panel" role="dialog" aria-label="Mago, o assistente virtual">
+      <div class="chatbot-header">
+        <div class="chatbot-identity">
+          <img class="chatbot-avatar" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjqCUvrIf6rJjXUCCNGf_vRz06lCfAFk4VXRKBmLfSq3DlpGJJR25vw2vzU_agi4X_r038WmN7wqL_t2WTb02gtSFqe2It-LRrCZx8A-Frrhyphenhyphen6ar14f-D8JdEEp3hhC-AP2vMGbQthSVDWU/s640-rw/mago.jpg" alt="Mago, o assistente virtual" />
+          <div>
+            <strong>Mago, o assistente virtual</strong>
+            <div class="chatbot-sub">Ajuda com compras e recomendações</div>
+          </div>
+        </div>
+        <div class="chatbot-actions">
+          <button id="chatbotMinimize" class="chatbot-icon" title="Minimizar">—</button>
+          <button id="chatbotClose" class="chatbot-icon" title="Fechar">✕</button>
+        </div>
+      </div>
+
+      <div id="chatbotMessages" class="chatbot-messages" aria-live="polite"></div>
+
+      <form id="chatbotForm" class="chatbot-form" aria-label="Enviar mensagem ao assistente">
+        <input id="chatbotInput" class="chatbot-input" type="text" placeholder="Escreva sua dúvida..." aria-label="Mensagem" autocomplete="off">
+        <button type="submit" class="chatbot-send">Enviar</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="scripts/chatbotIntents.js"></script>
+  <script src="scripts/chatbotCore.js"></script>
+  <script src="scripts/checkout.js"></script>
+  <script src="scripts/main.js"></script>
+  <script>
+    // Botão Voltar retorna para a loja
+    document.addEventListener('DOMContentLoaded', function(){
+      document.getElementById('closeCheckoutFlow')?.addEventListener('click', function(){
+        window.location.href = 'index.html';
+      });
+      // Mostrar mensagem inline container quando usado
+      const m = document.getElementById('checkoutMessage');
+      if(m){ m.style.display = ''; }
+
+      // Popular vitrine: listar até 10 itens do carrinho (um abaixo do outro)
+      try{
+        const list = document.getElementById('checkoutProductsList');
+        const cart = JSON.parse(sessionStorage.getItem('cart') || '[]');
+        if(list && Array.isArray(cart) && cart.length > 0){
+          const items = cart.slice(0,10);
+          items.forEach((it, idx) => {
+            const card = document.createElement('div');
+            card.className = 'product-card';
+
+            const media = document.createElement('div');
+            media.className = 'product-media';
+            const img = document.createElement('img');
+            if(idx === 0){ img.id = 'checkoutGameImage'; }
+            img.alt = it.title || 'Produto';
+            img.src = it.image || '';
+            media.appendChild(img);
+
+            const info = document.createElement('div');
+            info.className = 'product-info';
+            const h2 = document.createElement('h2');
+            if(idx === 0){ h2.id = 'checkoutGameName'; }
+            h2.textContent = it.title || 'Seu pedido';
+            info.appendChild(h2);
+
+            const meta = document.createElement('div');
+            meta.className = 'product-meta';
+            const b1 = document.createElement('span'); b1.className='product-badge'; b1.textContent='Digital';
+            const b2 = document.createElement('span'); b2.className='product-badge'; b2.textContent='Entrega por e-mail';
+            meta.appendChild(b1); meta.appendChild(b2);
+            info.appendChild(meta);
+
+            const detailsRow = document.createElement('div');
+            detailsRow.style.display='flex'; detailsRow.style.flexWrap='wrap'; detailsRow.style.gap='8px'; detailsRow.style.alignItems='center'; detailsRow.style.margin='6px 0 8px';
+            const lblPlat = document.createElement('span'); lblPlat.style.color='#9aa4b2'; lblPlat.textContent='Plataformas:';
+            const plats = document.createElement('span'); plats.className='order-meta'; if(idx===0){ plats.id='checkoutPlatforms'; } plats.textContent='—';
+            const sep1 = document.createElement('span'); sep1.style.opacity='.2'; sep1.textContent='|';
+            const lblGen = document.createElement('span'); lblGen.style.color='#9aa4b2'; lblGen.textContent='Categoria:';
+            const gens = document.createElement('span'); gens.className='order-meta'; if(idx===0){ gens.id='checkoutGenres'; } gens.textContent='—';
+            const sep2 = document.createElement('span'); sep2.style.opacity='.2'; sep2.textContent='|';
+            const lblRate = document.createElement('span'); lblRate.style.color='#9aa4b2'; lblRate.textContent='Nota:';
+            const rate = document.createElement('span'); rate.className='order-meta'; if(idx===0){ rate.id='checkoutRating'; } rate.textContent='—';
+            detailsRow.appendChild(lblPlat); detailsRow.appendChild(plats); detailsRow.appendChild(sep1);
+            detailsRow.appendChild(lblGen); detailsRow.appendChild(gens); detailsRow.appendChild(sep2);
+            detailsRow.appendChild(lblRate); detailsRow.appendChild(rate);
+            info.appendChild(detailsRow);
+
+            const priceRow = document.createElement('div');
+            priceRow.style.display='flex'; priceRow.style.alignItems='center'; priceRow.style.gap='10px'; priceRow.style.margin='8px 0 10px';
+            const priceLbl = document.createElement('span'); priceLbl.style.color='#9aa4b2'; priceLbl.textContent='Preço:';
+            const priceStrong = document.createElement('strong'); priceStrong.className='order-price'; if(idx===0){ priceStrong.id='checkoutGamePrice'; } priceStrong.textContent = 'R$ ' + Number(it.price||0).toFixed(2);
+            priceRow.appendChild(priceLbl); priceRow.appendChild(priceStrong);
+            info.appendChild(priceRow);
+
+            const desc = document.createElement('p'); desc.className='product-desc'; if(idx===0){ desc.id='checkoutDescription'; } desc.textContent = 'Carregando detalhes...';
+            info.appendChild(desc);
+
+            // Attach
+            card.appendChild(media); card.appendChild(info);
+            list.appendChild(card);
+
+            // Fetch details per item if id exists
+            if(it.id && window.API_BASE){
+              fetch(`${API_BASE}/games/${it.id}/details`).then(async (res)=>{
+                if(!res.ok) throw new Error(String(res.status));
+                const data = await res.json();
+                plats.textContent = (data.platforms && data.platforms.length) ? data.platforms.join(', ') : '—';
+                gens.textContent = (data.genres && data.genres.length) ? data.genres.join(', ') : '—';
+                rate.textContent = (data.rating != null) ? Number(data.rating).toFixed(1) : '—';
+                const d = data.description_raw || '';
+                desc.textContent = d ? (d.length > 250 ? d.slice(0,250).trim() + '…' : d) : '—';
+              }).catch(()=>{
+                plats.textContent = '—'; gens.textContent='—'; rate.textContent='—'; desc.textContent='Detalhes indisponíveis no momento';
+              });
+            } else {
+              desc.textContent = '—';
+            }
+          });
+        }
+      }catch(_e){}
+
+      // Atualiza rótulo de forma de pagamento selecionada
+      const label = document.getElementById('selectedPaymentLabel')?.querySelector('.pill');
+      const radios = Array.from(document.querySelectorAll('input[name="paymentMethod"]'));
+      function upd(){
+        if(!label) return;
+        const r = radios.find(x=>x.checked);
+        label.textContent = r ? (r.value.toUpperCase()) : '—';
+      }
+      radios.forEach(r => r.addEventListener('change', upd));
+      upd();
+    });
+  </script>
+</body>
+</html>

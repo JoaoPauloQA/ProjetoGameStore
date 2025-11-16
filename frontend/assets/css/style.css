@@ -1,0 +1,14 @@
+:root{
+	--bg:#0f172a;
+	--panel:#121324;
+	--muted:#9ca3af;
+	--gold:#fbbf24;
+	--gold-strong:#eab308;
+	--accent:#00d4ff;
+	--card:#111218;
+	--glass: rgba(255,255,255,0.04);
+	--transition: 220ms cubic-bezier(.2,.9,.2,1);
+}
+
+/* Escopo completo movido de frontend/styles/style.css */
+[CONTENT_REPLACED]

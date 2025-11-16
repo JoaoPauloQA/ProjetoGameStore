@@ -17,10 +17,19 @@ require('dotenv').config(); // load .env into process.env
 const express = require("express");
 const cors = require("cors");
 const fetch = require('node-fetch');
-const bcrypt = require('bcrypt');
 const { pool } = require('./db'); // Importa a conexão com PostgreSQL
+const { authMiddleware, optionalAuth } = require('./middlewares/authMiddleware');
+const authController = require('./controllers/authController');
+const comprasRoutes = require('./routes/compras');
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Validar JWT_SECRET ao iniciar o servidor
+if (!process.env.JWT_SECRET) {
+  console.error('❌ ERRO CRÍTICO: JWT_SECRET não configurado no arquivo .env');
+  console.error('   Adicione uma linha com: JWT_SECRET=sua_chave_secreta_aqui');
+  process.exit(1);
+}
 
 app.use(cors());
 app.use(express.json());
@@ -89,6 +98,44 @@ app.get("/api/games", async (req, res) => {
     console.error('Erro ao buscar jogos:', error);
     res.status(500).json({ 
       error: 'Erro ao buscar jogos do banco de dados',
+      details: error.message 
+    });
+  }
+});
+
+// GET /api/jogos/recomendado - Retorna 1 jogo aleatório do banco
+app.get('/api/jogos/recomendado', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, price, image
+       FROM jogos
+       WHERE title IS NOT NULL
+       ORDER BY RANDOM()
+       LIMIT 1`
+    );
+    if (!result.rows.length) {
+      return res.status(404).json({ error: 'Nenhum jogo encontrado' });
+    }
+    const row = result.rows[0];
+    return res.json({ id: row.id, title: row.title, price: Number(row.price || 0), image: row.image || '' });
+  } catch (error) {
+    console.error('Erro em /api/jogos/recomendado:', error);
+    return res.status(500).json({ error: 'Erro ao obter recomendação', details: error.message });
+  }
+});
+
+// GET /api/games/count - Retorna o total de jogos no catálogo (incluindo Game Pass)
+app.get("/api/games/count", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*) as total FROM jogos`
+    );
+    const total = parseInt(result.rows[0]?.total || 0);
+    res.json({ total });
+  } catch (error) {
+    console.error('Erro ao contar jogos:', error);
+    res.status(500).json({ 
+      error: 'Erro ao contar jogos',
       details: error.message 
     });
   }
@@ -308,227 +355,196 @@ app.get('/api/rawg-news', async (req, res) => {
     res.status(500).json({ error: 'Erro ao consultar notícias RAWG', details: err.message });
   }
 });
-// Endpoint de compra (checkout)
-// POST /api/checkout - Processa a compra de um jogo
-app.post("/api/checkout", async (req, res) => {
-  const { gameId, nome, email, cep, formaPagamento, cupom } = req.body;
+// ========================================
+// ENDPOINT DE COMPRA (CHECKOUT)
+// ========================================
+// POST /api/checkout - Processa a compra e registra no banco de dados
+// Requer autenticação via JWT
+app.post("/api/checkout", authMiddleware, async (req, res) => {
+  const { gameId, nome, email, cep, formaPagamento, cupom, cart } = req.body;
+  const userId = req.userId; // ID do usuário autenticado (do token JWT)
 
-  // Novo fluxo simplificado: se possuir formaPagamento, processa sem exigir nome/email/cep
-  if(formaPagamento){
-    const protocolo = '#CHK' + Math.floor(100000 + Math.random() * 900000).toString();
+  // Validação: formaPagamento é obrigatório
+  if(!formaPagamento){
+    return res.status(400).json({ 
+      error: 'Forma de pagamento é obrigatória',
+      mensagem: 'Selecione uma forma de pagamento para continuar.'
+    });
+  }
 
-    console.log('\n[CHECKOUT] ' + new Date().toISOString());
-    console.log(' Protocolo:', protocolo);
-    if(nome) console.log(' Nome:', nome);
-    if(email) console.log(' Email:', email);
-    if(cep) console.log(' CEP:', cep);
-    console.log(' FormaPagamento:', formaPagamento);
-    if(cupom) console.log(' Cupom:', cupom);
-    
-    if(gameId){
-      try {
-        const result = await pool.query('SELECT * FROM jogos WHERE id = $1', [gameId]);
-        if(result.rows.length > 0){
-          const game = result.rows[0];
-          console.log(' Game:', game.title || game.name || game.id);
+  // Gera protocolo único para a compra
+  const protocolo = '#CHK' + Math.floor(100000 + Math.random() * 900000).toString();
+
+  console.log('\n[CHECKOUT] ' + new Date().toISOString());
+  console.log(' Protocolo:', protocolo);
+  console.log(' User ID:', userId);
+  if(nome) console.log(' Nome:', nome);
+  if(email) console.log(' Email:', email);
+  if(cep) console.log(' CEP:', cep);
+  console.log(' FormaPagamento:', formaPagamento);
+  if(cupom) console.log(' Cupom:', cupom);
+
+  try {
+    // ========================================
+    // PROCESSAMENTO DO CARRINHO
+    // ========================================
+    let itemsToSave = [];
+    let totalPrice = 0;
+
+    // Verifica se há carrinho com múltiplos itens
+    if(Array.isArray(cart) && cart.length > 0){
+      console.log(' Carrinho com', cart.length, 'item(ns)');
+      
+      // Processa cada item do carrinho
+      for(const item of cart){
+        const gameResult = await pool.query('SELECT * FROM jogos WHERE id = $1', [item.id]);
+        if(gameResult.rows.length > 0){
+          const game = gameResult.rows[0];
+          const qty = parseInt(item.qty) || 1;
+          const itemTotal = parseFloat(game.price) * qty;
+          
+          itemsToSave.push({
+            game_id: game.id,
+            quantity: qty,
+            price: game.price
+          });
+          
+          totalPrice += itemTotal;
+          console.log('  -', game.title, 'x', qty, '= R$', itemTotal.toFixed(2));
         }
-      } catch (error) {
-        console.error('Erro ao buscar jogo no checkout:', error);
       }
+    } 
+    // Fallback: compra de um único jogo (fluxo legado)
+    else if(gameId){
+      console.log(' Compra de jogo único (ID:', gameId, ')');
+      
+      const gameResult = await pool.query('SELECT * FROM jogos WHERE id = $1', [gameId]);
+      if(gameResult.rows.length === 0){
+        return res.status(404).json({ error: 'Jogo não encontrado' });
+      }
+      
+      const game = gameResult.rows[0];
+      itemsToSave.push({
+        game_id: game.id,
+        quantity: 1,
+        price: game.price
+      });
+      
+      totalPrice = parseFloat(game.price);
+      console.log('  -', game.title, '= R$', totalPrice.toFixed(2));
+    } 
+    else {
+      return res.status(400).json({ 
+        error: 'Nenhum item para comprar',
+        mensagem: 'Adicione itens ao carrinho antes de finalizar a compra.'
+      });
     }
 
-    return setTimeout(() => {
-      res.json({ sucesso: true, mensagem: 'Compra realizada com sucesso!', protocolo });
-    }, 600);
-  }
+    // Validação: carrinho não pode estar vazio
+    if(itemsToSave.length === 0){
+      return res.status(400).json({ 
+        error: 'Carrinho vazio',
+        mensagem: 'Adicione itens ao carrinho antes de finalizar a compra.'
+      });
+    }
 
-  // Fallback: comportamento legado onde apenas gameId era enviado
-  if(gameId){
+    console.log(' Total da compra: R$', totalPrice.toFixed(2));
+
+    // ========================================
+    // SALVAR NO BANCO DE DADOS
+    // ========================================
+    // Inicia transação para garantir consistência dos dados
+    await pool.query('BEGIN');
+
     try {
-      // Busca o jogo no banco de dados
-      const result = await pool.query('SELECT * FROM jogos WHERE id = $1', [gameId]);
+      // 1. Insere o pedido na tabela orders
+      const orderResult = await pool.query(
+        'INSERT INTO orders (user_id, total_price, created_at) VALUES ($1, $2, NOW()) RETURNING id',
+        [userId, totalPrice]
+      );
       
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: "Jogo não encontrado" });
+      const orderId = orderResult.rows[0].id;
+      console.log(' Order ID criado:', orderId);
+
+      // 2. Insere todos os itens do pedido na tabela order_items
+      for(const item of itemsToSave){
+        await pool.query(
+          'INSERT INTO order_items (order_id, game_id, quantity) VALUES ($1, $2, $3)',
+          [orderId, item.game_id, item.quantity]
+        );
       }
-      
-      const game = result.rows[0];
-      console.log('Nova compra (legacy):', game);
-      
-      return setTimeout(() => {
-        res.json({ 
-          message: "Compra realizada com sucesso!", 
-          order: {
-            game,
-            date: new Date().toISOString()
-          }
-        });
-      }, 500);
-    } catch (error) {
-      console.error('Erro no checkout:', error);
+
+      // Confirma a transação
+      await pool.query('COMMIT');
+      console.log(' ✅ Compra salva com sucesso no banco de dados!\n');
+
+      // Retorna sucesso para o frontend
+      return res.json({ 
+        sucesso: true, 
+        mensagem: 'Compra realizada com sucesso!', 
+        protocolo,
+        orderId // Retorna o ID do pedido criado
+      });
+
+    } catch (dbError) {
+      // Em caso de erro, desfaz todas as operações
+      await pool.query('ROLLBACK');
+      console.error(' ❌ Erro ao salvar compra no banco:', dbError);
+      throw dbError;
+    }
+
+  } catch (error) {
+    console.error('❌ ERRO NO CHECKOUT:', error);
+    console.error('Stack trace:', error.stack);
+    
+    // Mensagem específica se a tabela não existir
+    if(error.message && error.message.includes('does not exist')){
       return res.status(500).json({ 
-        error: 'Erro ao processar compra',
-        details: error.message 
+        error: 'Tabelas não criadas',
+        mensagem: 'As tabelas de pedidos não foram criadas no banco de dados. Execute o script setup-orders.sql',
+        details: 'Tabelas orders/order_items não existem' 
       });
     }
+    
+    return res.status(500).json({ 
+      error: 'Erro ao processar compra',
+      mensagem: 'Ocorreu um erro ao processar sua compra. Tente novamente.',
+      details: error.message 
+    });
   }
-
-  // Caso contrário, retorna bad request
-  res.status(400).json({ error: 'Parâmetros inválidos para /api/checkout' });
 });
 
 // ========================================
-// ROTAS DE AUTENTICAÇÃO
+// ROTAS DE AUTENTICAÇÃO (JWT)
 // ========================================
 
-// POST /api/auth/register - Cadastro de novo usuário
-app.post('/api/auth/register', async (req, res) => {
-  const { username, email, password, nome_completo } = req.body;
+// POST /api/auth/register - Cadastro de novo usuário (retorna token)
+app.post('/api/auth/register', authController.register);
 
-  try {
-    // Validação dos campos obrigatórios
-    if (!username || !email || !password) {
-      return res.status(400).json({ 
-        error: 'Campos obrigatórios faltando',
-        message: 'Username, email e password são obrigatórios' 
-      });
-    }
+// POST /api/auth/login - Login de usuário (retorna token JWT)
+app.post('/api/auth/login', authController.login);
 
-    // Validação de formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ 
-        error: 'Email inválido',
-        message: 'Por favor, forneça um email válido' 
-      });
-    }
+// GET /api/auth/verify - Verifica se o token é válido (requer autenticação)
+app.get('/api/auth/verify', authMiddleware, authController.verifyToken);
 
-    // Validação de senha (mínimo 6 caracteres)
-    if (password.length < 6) {
-      return res.status(400).json({ 
-        error: 'Senha muito curta',
-        message: 'A senha deve ter no mínimo 6 caracteres' 
-      });
-    }
+// POST /api/auth/refresh - Renova o token JWT (requer autenticação)
+app.post('/api/auth/refresh', authMiddleware, authController.refreshToken);
 
-    // Verifica se o usuário já existe
-    const userCheck = await pool.query(
-      'SELECT id FROM usuarios WHERE username = $1 OR email = $2',
-      [username, email]
-    );
-
-    if (userCheck.rows.length > 0) {
-      return res.status(409).json({ 
-        error: 'Usuário já existe',
-        message: 'Username ou email já cadastrado' 
-      });
-    }
-
-    // Hash da senha com bcrypt
-    const saltRounds = 10;
-    const senha_hash = await bcrypt.hash(password, saltRounds);
-
-    // Insere o novo usuário no banco
-    const result = await pool.query(
-      `INSERT INTO usuarios (username, email, senha_hash, nome_completo) 
-       VALUES ($1, $2, $3, $4) 
-       RETURNING id, username, email, nome_completo, created_at`,
-      [username, email, senha_hash, nome_completo || null]
-    );
-
-    const newUser = result.rows[0];
-
-    console.log('✅ Novo usuário cadastrado:', newUser.username);
-
-    // Retorna os dados do usuário (sem a senha)
-    res.status(201).json({
-      success: true,
-      message: 'Usuário cadastrado com sucesso!',
-      user: {
-        id: newUser.id,
-        username: newUser.username,
-        email: newUser.email,
-        nome_completo: newUser.nome_completo,
-        created_at: newUser.created_at
-      }
-    });
-
-  } catch (error) {
-    console.error('Erro ao cadastrar usuário:', error);
-    res.status(500).json({ 
-      error: 'Erro ao cadastrar usuário',
-      message: error.message 
-    });
-  }
-});
-
-// POST /api/auth/login - Login de usuário (aceita email ou username)
-app.post('/api/auth/login', async (req, res) => {
-  // Aceita tanto { email, password } quanto { username, password }
-  const { email, username, password } = req.body;
-  const identifier = (email || username || '').trim();
-
-  try {
-    // Validação dos campos obrigatórios
-    if (!identifier || !password) {
-      return res.status(400).json({ 
-        error: 'Campos obrigatórios faltando',
-        message: 'Email/username e password são obrigatórios' 
-      });
-    }
-
-    // Busca o usuário no banco
-    const result = await pool.query(
-      'SELECT id, username, email, senha_hash, nome_completo FROM usuarios WHERE username = $1 OR email = $1',
-      [identifier]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({ 
-        error: 'Credenciais inválidas',
-        message: 'Usuário ou senha incorretos' 
-      });
-    }
-
-    const user = result.rows[0];
-
-    // Verifica a senha com bcrypt
-    const senhaValida = await bcrypt.compare(password, user.senha_hash);
-
-    if (!senhaValida) {
-      return res.status(401).json({ 
-        error: 'Credenciais inválidas',
-        message: 'Usuário ou senha incorretos' 
-      });
-    }
-
-  console.log('✅ Login bem-sucedido:', user.username);
-
-    // Retorna os dados do usuário (sem a senha)
-    res.json({
-      success: true,
-      message: 'Login realizado com sucesso!',
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        nome_completo: user.nome_completo
-      }
-    });
-
-  } catch (error) {
-    console.error('Erro ao fazer login:', error);
-    res.status(500).json({ 
-      error: 'Erro ao fazer login',
-      message: error.message 
-    });
-  }
-});
-
-// GET /api/account/:id - Dados da conta + compras
+// GET /api/account/:id - Dados da conta + compras (PROTEGIDA)
 // Retorna dados do usuário e uma lista de compras (se a tabela existir)
-app.get('/api/account/:id', async (req, res) => {
+// Agora protegida por JWT - usuário só pode ver sua própria conta
+app.get('/api/account/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
+  const userId = req.userId; // Do token JWT
+  
+  // Validação: usuário só pode acessar sua própria conta
+  if (parseInt(id) !== userId) {
+    return res.status(403).json({ 
+      error: 'Acesso negado',
+      message: 'Você só pode acessar sua própria conta' 
+    });
+  }
+  
   if(!id) return res.status(400).json({ error: 'missing id' });
 
   try {
@@ -545,9 +561,6 @@ app.get('/api/account/:id', async (req, res) => {
     const user = u.rows[0];
 
     // Tenta buscar compras do usuário (se tabela existir)
-    // Estrutura esperada (exemplo da tabela sugerida):
-    // compras(id, usuario_id, jogo_id, preco, data_compra)
-    // e jogos(id, title, image)
     let purchases = [];
     try {
       const p = await pool.query(
@@ -566,8 +579,7 @@ app.get('/api/account/:id', async (req, res) => {
       );
       purchases = p.rows;
     } catch (err) {
-      // Fallback silencioso: se a tabela não existir ou houver erro na consulta, 
-      // apenas retorna lista vazia sem logar erro no terminal.
+      // Fallback silencioso se tabela não existir
       purchases = [];
     }
 
@@ -578,32 +590,85 @@ app.get('/api/account/:id', async (req, res) => {
   }
 });
 
-// GET /api/auth/verify - Verifica se o usuário existe
-app.get('/api/auth/verify/:username', async (req, res) => {
-  const { username } = req.params;
+// ========================================
+// HISTÓRICO DE COMPRAS DO USUÁRIO
+// ========================================
+// GET /api/orders/user/:id - Retorna todas as compras do usuário com detalhes dos jogos
+// Requer autenticação via JWT
+app.get('/api/orders/user/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.userId; // ID do usuário autenticado (do token JWT)
+  
+  // Validação: usuário só pode ver suas próprias compras
+  if (parseInt(id) !== userId) {
+    return res.status(403).json({ 
+      error: 'Acesso negado',
+      message: 'Você só pode acessar seu próprio histórico de compras' 
+    });
+  }
 
   try {
-    const result = await pool.query(
-      'SELECT id, username, email, nome_completo FROM usuarios WHERE username = $1',
-      [username]
+    // ========================================
+    // BUSCA TODAS AS COMPRAS DO USUÁRIO
+    // ========================================
+    // Query com JOIN entre orders, order_items e jogos
+    // Agrupa os jogos por pedido para facilitar renderização
+    const ordersResult = await pool.query(
+      `SELECT 
+        o.id AS order_id,
+        o.total_price,
+        o.created_at,
+        json_agg(
+          json_build_object(
+            'game_id', j.id,
+            'title', j.title,
+            'image', j.image,
+            'price', j.price,
+            'quantity', oi.quantity
+          ) ORDER BY oi.id
+        ) AS items
+      FROM orders o
+      LEFT JOIN order_items oi ON oi.order_id = o.id
+      LEFT JOIN jogos j ON j.id = oi.game_id
+      WHERE o.user_id = $1
+      GROUP BY o.id, o.total_price, o.created_at
+      ORDER BY o.created_at DESC
+      LIMIT 50`,
+      [id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'Usuário não encontrado' 
-      });
-    }
+    // Formata os dados para o frontend
+    const orders = ordersResult.rows.map(row => ({
+      orderId: row.order_id,
+      totalPrice: parseFloat(row.total_price),
+      createdAt: row.created_at,
+      items: row.items || []
+    }));
 
-    res.json({
+    console.log(`[ORDERS] Usuário ${id} possui ${orders.length} compra(s)`);
+    
+    return res.json({ 
       success: true,
-      user: result.rows[0]
+      orders: orders,
+      total: orders.length
     });
 
   } catch (error) {
-    console.error('Erro ao verificar usuário:', error);
-    res.status(500).json({ 
-      error: 'Erro ao verificar usuário',
-      message: error.message 
+    console.error('Erro em /api/orders/user/:id', error);
+    
+    // Se a tabela não existe, retorna lista vazia
+    if(error.message && error.message.includes('does not exist')){
+      return res.json({ 
+        success: true,
+        orders: [],
+        total: 0,
+        message: 'Nenhuma compra registrada ainda'
+      });
+    }
+    
+    return res.status(500).json({ 
+      error: 'Erro ao buscar histórico de compras',
+      details: error.message 
     });
   }
 });
@@ -641,6 +706,33 @@ app.get('/api/games/:id/details', async (req, res) => {
   }catch(err){
     console.error('Error in /api/games/:id/details', err);
     return res.status(500).json({ error: 'Erro ao obter detalhes do jogo', details: err.message });
+  }
+});
+
+// ========================================
+// CONTA DO USUÁRIO (ME) - PROTEGIDA COM JWT
+// ========================================
+// GET /api/user/me - Dados básicos do usuário autenticado
+// Requer token JWT no header: Authorization: Bearer <token>
+app.get('/api/user/me', authMiddleware, async (req, res) => {
+  const userId = req.userId; // Extraído do token JWT pelo middleware
+  try{
+    const r = await pool.query(
+      'SELECT nome_completo, email, created_at, username FROM usuarios WHERE id = $1',
+      [userId]
+    );
+    if(r.rows.length === 0){
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+    const row = r.rows[0];
+    return res.json({
+      nome: row.nome_completo || row.username || '',
+      email: row.email || '',
+      created_at: row.created_at
+    });
+  }catch(err){
+    console.error('Erro em /api/user/me', err);
+    return res.status(500).json({ error: 'Erro ao carregar dados do usuário', details: err.message });
   }
 });
 
@@ -702,6 +794,11 @@ app.get('/__routes', (req, res) => {
     res.status(500).json({ error: 'failed to list routes', details: err.message });
   }
 });
+
+// ================================
+// ROTAS: COMPRAS (HISTÓRICO)
+// ================================
+app.use('/api/compras', comprasRoutes);
 
 // API not-found handler — return JSON instead of Express HTML 404 for /api/* requests
 app.use('/api', (req, res) => {

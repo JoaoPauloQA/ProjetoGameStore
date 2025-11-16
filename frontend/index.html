@@ -114,7 +114,7 @@
       <!-- Barra de pesquisa de jogos -->
       <form id="searchForm" class="search-form" role="search" aria-label="Pesquisar jogos">
         <label for="searchInput" class="visually-hidden">Pesquisar jogos</label>
-        <input id="searchInput" class="search-input" type="search" placeholder="Oque voce esta procurando hoje ?" aria-label="Pesquisar jogo" autocomplete="off" />
+        <input id="searchInput" class="search-input" type="search" placeholder="Buscar jogo ou palavra-chave" aria-label="Pesquisar jogo" autocomplete="off" />
         <button type="submit" class="search-btn" aria-label="Pesquisar">🔍</button>
         <div id="searchSuggestions" class="search-suggestions" aria-live="polite"></div>
       </form>
@@ -123,8 +123,12 @@
         <span id="cartCount" class="cart-badge" aria-live="polite">0</span>
       </button>
       <button id="loginBtn" class="login-nav-btn">Entrar</button>
-      <!-- novo botão de menu do usuário -->
-      <button id="userMenuBtn" class="user-menu-btn hidden" aria-haspopup="dialog" aria-label="Abrir menu do usuário">☰</button>
+      
+      <!-- Dropdown do usuário (aparece ao clicar no botão do usuário logado) -->
+      <div id="userDropdown" class="user-dropdown hidden" role="menu" aria-hidden="true">
+        <button id="udAccount" class="ud-item" role="menuitem">Minha conta</button>
+        <button id="udLogout" class="ud-item danger" role="menuitem">Sair</button>
+      </div>
     </nav>
   </header>
 
@@ -147,8 +151,12 @@
       </form>
       <div class="login-footer">
         <a href="#" class="forgot-password">Esqueceu sua senha?</a>
-  <p class="signup-link">Não tem conta? <a href="#" id="openRegisterLink">Cadastre-se</a></p>
-  <!-- Modal de Cadastro -->
+        <p class="signup-link">Não tem conta? <a href="#" id="openRegisterLink">Cadastre-se</a></p>
+      </div>
+
+      
+
+  <!-- Modal de Cadastro (separado, fora do loginModal) -->
   <div id="registerModal" class="modal login-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="registerModalTitle">
     <div class="modal-content login-modal-content" tabindex="-1">
       <button id="closeRegisterModal" class="modal-close-x" aria-label="Fechar modal">&times;</button>
@@ -254,6 +262,11 @@
             <div class="trust-sub">Seus dados protegidos!</div>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+  
+ 
       </div>
     </div>
   </section>
@@ -415,7 +428,21 @@
       <p>Eles servem para melhorar a sua experiência. Ao usar nosso site, você está concordando com o uso de cookies.</p>
       <div class="cookie-buttons">
         <button id="acceptCookies" class="cookie-accept">Aceitar</button>
-        <a href="#" class="cookie-learn-more">Saiba mais</a>
+        <a href="#" id="cookieLearnMore" class="cookie-learn-more">Saiba mais</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de informações sobre cookies -->
+  <div id="cookieInfoModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="cookieInfoTitle">
+    <div class="modal-content" tabindex="-1">
+      <button id="closeCookieInfo" class="modal-close-x" aria-label="Fechar modal">&times;</button>
+      <h2 id="cookieInfoTitle">🍪 O que são Cookies?</h2>
+      <div class="cookie-info-text">
+        <p>Cookies são pequenos arquivos de texto que os sites salvam no seu navegador para armazenar informações sobre suas preferências e atividade, tornando a navegação mais fácil e personalizada. Eles ajudam a manter você logado, lembrar suas configurações e fornecer conteúdo relevante.</p>
+      </div>
+      <div class="modal-actions" style="margin-top:20px;">
+        <button id="closeCookieInfoBtn" class="buy-btn">Entendi</button>
       </div>
     </div>
   </div>
@@ -447,7 +474,8 @@
     </div>
   </div>
 
-  <script src="scripts/chatbot.js"></script>
+  <script src="scripts/chatbotIntents.js"></script>
+  <script src="scripts/chatbotCore.js"></script>
   <script src="scripts/checkout.js"></script>
   <script src="scripts/main.js"></script>
 </body>

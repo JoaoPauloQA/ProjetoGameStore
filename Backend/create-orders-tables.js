@@ -1,2 +1,2 @@
 // Wrapper para manter compatibilidade: usa a versão em scripts
-require('./scripts/init-users-db');
+require('./scripts/create-orders-tables');
