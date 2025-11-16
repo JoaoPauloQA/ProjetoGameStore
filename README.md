@@ -1,4 +1,178 @@
-# GameStore \n\nPlataforma de e-commerce de jogos com backend em Node.js/Express + PostgreSQL, autenticação JWT, checkout transacional e chatbot inteligente com intents. O projeto está organizado para facilitar expansão futura (testes E2E, CI/CD, BDD).\n\n## 🚀 Tecnologias e bibliotecas utilizadas\n- **Node.js / Express** – API REST\n- **PostgreSQL (pg)** – Banco relacional\n- **JWT / bcrypt** – Autenticação e hashing de senha\n- **dotenv / cors** – Configuração de ambiente e segurança básica\n- **Vanilla JS (Frontend)** – Páginas e lógica do chatbot\n- **Intent Engine (custom)** – Roteamento de mensagens do chatbot\n\n> Planejado para futura inclusão de Cypress + Allure para testes automatizados.\n\n## 📌 Funcionalidades Principais ("Cenários" Implementados)\n✔️ Registro e Login com JWT\n✔️ Verificação rápida de usuário / sessão (`/api/user/me`)\n✔️ Recuperação de senha via fluxo guiado do chatbot\n✔️ Listagem de jogos com preços, imagens e plataformas (`/api/jogos`)\n✔️ Recomendação aleatória de jogo (`/api/jogos/recomendado`)\n✔️ Checkout com criação de `orders` e `order_items` (transação)\n✔️ Histórico de compras unificado (legado `compras` ou novas tabelas) via `/api/compras/historico` e `/api/orders/user/:id`\n✔️ Seed de itens Game Pass (`npm run seed:gamepass`)\n✔️ Chatbot com intents: menu principal, histórico, ticket, recomendação, suporte humano simulado\n✔️ Scripts de verificação e inicialização de banco (init, verify, create tables)\n\n## 🛠 Scripts Úteis (Backend)\nTodos localizados em `Backend/scripts/` e com wrappers de compatibilidade na raiz. Execute sempre dentro de `Backend/`.\n\n| Ação | Comando | Descrição |\n|------|---------|-----------|\n| Iniciar servidor | `npm start` | Sobe API na porta configurada (default 3000) |\n| Seed Game Pass | `npm run seed:gamepass` | Insere itens de assinatura em `jogos` |\n| Criar tabelas de pedidos | `node scripts/create-orders-tables.js` | Cria `orders` e `order_items` |\n| Verificar tabelas de pedidos | `node scripts/verify-orders-tables.js` | Checa existência e estrutura |\n| Inicializar tabela jogos | `node scripts/init-db.js` | Recria e popula `jogos` (destrutivo) |\n| Inicializar tabela usuários | `node scripts/init-users-db.js` | Recria `usuarios` (destrutivo) |\n| Teste rápido API pública | `node scripts/test-api.js` | Smoke GETs básicos |\n| Teste fluxo auth | `node scripts/test-auth.js` | Exercita login/registro/verificação |\n| Verificar conexão Postgres | `node scripts/verify-db.js` | Lista jogos e valida imagens/prices |\n\n## 🔐 Autenticação\n- Registro: `POST /api/auth/register`\n- Login: `POST /api/auth/login` (retorna token + dados)\n- Sessão: `GET /api/user/me` (JWT)\n- Tokens armazenados no `sessionStorage` no frontend.\n\n## 🤖 Chatbot (Intents)\nIntents definidas em `frontend/scripts/chatbotIntents.js` e orquestradas por `chatbotCore.js`. Principais:\n- Histórico de compras (normaliza legado e novo modelo)\n- Ticket fictício (entrada do número e resposta simulada)\n- Recomendações (chama endpoint aleatório)\n- Recuperação de senha (fluxo guiado)\n- Menu principal com opções numeradas e fallback genérico\n\n## 🧪 Testes (Planejado)\nEstrutura preparada para futura inclusão de:\n- Cypress para E2E (login, catálogo, checkout, histórico, chatbot)\n- Allure Reports para visualização de execução\n- GitHub Actions para CI/CD (gatilho em push / PR)\n\n## 📊 Logs & Verificação\nScripts fornecem saída rica em console (Unicode) para facilitar diagnóstico rápido sem ferramentas externas.\n\n## ⚙️ Integração Contínua (Planejada)\nSugestão de pipeline futuro (`.github/workflows/ci.yml`):\n1. Instalar dependências backend\n2. Subir serviço Postgres (GitHub Actions service container)\n3. Rodar scripts de inicialização / migrations\n4. Executar testes automatizados (quando adicionados)\n5. Publicar relatórios (Allure) como artefatos\n\n## 📝 Cenários BDD (Planejado)\nDiretório sugerido futuro: `/gherkin-scenarios/` com casos Given-When-Then para:\n- Checkout transacional\n- Recuperação de senha chatbot\n- Recomendação de jogo\n- Histórico de compras consolidado\n\n## ▶️ Como Executar Localmente\n1. Clone o repositório:\n```bash\ngit clone https://github.com/JoaoPauloQA/ProjetoGameStore.git\ncd ProjetoGameStore/Backend\n```\n2. Crie arquivo `.env` a partir de `.env.example` com \n```env\nDATABASE_URL=postgres://usuario:senha@host:porta/db\nJWT_SECRET=uma_chave_segura\n```\n3. Instale dependências e inicie:\n```bash\nnpm install\nnpm start\n```\n4. (Opcional) Popule itens especiais:\n```bash\nnpm run seed:gamepass\n```\n5. Acesse o frontend abrindo `frontend/index.html` em um servidor estático ou direto no navegador (tokens e lógica funcionam local).\n\n## 📁 Estrutura do Projeto (Simplificada)\n```\nBackend/\n  server.js\n  db.js\n  controllers/\n  routes/\n  middlewares/\n  scripts/               # Utilitários e manutenção (init, verify, seeds, testes)\n  setup-*.sql            # Scripts SQL (jogos, usuarios, pedidos, compras legacy)\nfrontend/\n  index.html, login.html, checkout.html, minha-conta.html\n  scripts/               # Lógica principal (chatbot, checkout, conta)\n  styles/                # CSS\ndatabase/\n  schema.sql, seed.sql   # Modelo consolidado (planejado)\noutros/\n  README.md              # Notas organizacionais\nREADME.md                # (Este arquivo) Visão geral do projeto\n```\n\n## 🔄 Fluxo de Compras (Resumo Técnico)\n1. Usuário adiciona jogos ao carrinho (frontend)\n2. Checkout chama `/api/checkout` (JWT obrigatório)\n3. Backend inicia transação: cria `orders` + `order_items`\n4. Total consolidado armazenado em `orders.total_price`\n5. Histórico visível em Minha Conta e chatbot (fallback para legado)\n\n## 📦 Modelo de Dados (Chaves Principais)\n- `usuarios (id, username, email, senha_hash, ...)`\n- `jogos (id, title, price, platforms[], image, plays)`\n- `orders (id, user_id, total_price, created_at)`\n- `order_items (id, order_id, game_id, quantity)`\n- (Legado) `compras` ainda suportado para histórico em transição\n\n## 🛡️ Segurança & Boas Práticas\n- JWT assinado com segredo definido em `.env`\n- Hash de senha com bcrypt (custo 10)\n- Checagens de integridade em preço e quantidade nos scripts SQL\n- Separação clara entre scripts utilitários e runtime (`scripts/`)\n\n## 📌 Próximos Passos Sugeridos\n- Adicionar suíte Cypress (E2E) + Gherkin\n- Implementar testes de API com Jest / Supertest\n- Configurar GitHub Actions (lint, testes, build, Allure)\n- Adicionar validação de entrada (celebrate / Joi) nas rotas críticas\n- Otimizar queries de histórico com agregações e paginação\n\n## 👨‍💻 Autor\n**João Paulo QA**  
+
+# GameStore
+
+E-commerce de jogos com frontend em HTML/CSS/JS, backend Node.js/Express, PostgreSQL para persistência, autenticação JWT e um chatbot inteligente baseado em intents. Estruturado para demonstrar domínio de arquitetura web completa, organização de código e fundamentos de testes / escalabilidade.
+
+## 🎯 Visão Geral
+Este projeto simula uma loja de jogos moderna:
+- Catálogo de jogos com preço, imagem, plataformas e métricas de uso.
+- Fluxo de compra com carrinho e criação de pedidos transacionais (orders + order_items).
+- Histórico de compras unificado (compatibilidade com tabela legada).
+- Autenticação segura (registro, login, verificação de sessão).
+- Chatbot contextual com recuperação de senha, recomendação e suporte.
+
+## 💼 Por Que É Relevante Para Recrutadores
+- Mostra integração completa: frontend + backend + banco relacional.
+- Usa práticas de transação no checkout (consistência de dados).
+- Estrutura escalável (separação clara por camadas e scripts operacionais).
+- Prepara terreno para automação (scripts, organização, roadmap de testes E2E/CI).
+- Inclui fallback de dados (legado → novo modelo) evidenciando pensamento de migração.
+
+## 🧱 Arquitetura (Resumo)
+- Frontend estático (HTML/JS) consumindo API REST.
+- Backend Express gerencia rotas, autenticação e transações.
+- PostgreSQL: modelo relacional otimizado com índices.
+- Chatbot: engine de intents (arquivo de registro + core de roteamento).
+- Scripts operacionais para inicialização, verificação e seed.
+
+```
+Frontend (HTML/JS) --> API (Express) --> PostgreSQL
+					^              |  ^
+					|              |  +-- Scripts (init/verify/seed)
+					+-- Chatbot <--+
+```
+
+## 🧩 Tecnologias & Bibliotecas
+- **Express**: camadas de rotas e integração de middlewares.
+- **pg**: acesso ao PostgreSQL (pool de conexões).
+- **bcrypt**: hash seguro de senhas.
+- **jsonwebtoken**: emissão e validação de tokens.
+- **dotenv**: configuração de ambiente.
+- **cors**: habilitação de acesso cross-origin.
+- **Vanilla JS**: simplicidade no frontend e controle direto do DOM.
+
+## 🚀 Funcionalidades Implementadas
+- Autenticação JWT (login, registro, sessão atual).
+- Recuperação de senha via chatbot (fluxo guiado).
+- Listagem de jogos: `/api/jogos`.
+- Recomendação aleatória: `/api/jogos/recomendado`.
+- Checkout transacional: cria `orders` + `order_items` garantindo consistência.
+- Histórico de compras consolidado: `/api/compras/historico` ou `/api/orders/user/:id`.
+- Seed Game Pass (upsert inteligente de assinaturas).
+- Chatbot com intents: menu principal, histórico, ticket fictício, recomendação, suporte humano simulado.
+
+## 🔐 Segurança
+- Hash de senha com **bcrypt** (custo 10).
+- Tokens JWT assinam contexto de usuário e protegem rotas (ex: checkout, histórico).
+- Índices e constraints (CHECK / FK) evitam inserir dados inválidos.
+- Uso restrito de transações para garantir atomicidade de compras.
+
+## 🗄️ Banco de Dados (Schema Chave)
+Tabelas principais:
+- `usuarios(id, username, email, senha_hash, ...)`
+- `jogos(id, title, price, platforms[], image, plays)`
+- `orders(id, user_id, total_price, created_at)`
+- `order_items(id, order_id, game_id, quantity)`
+- (Legado) `compras` – ainda suportada para compatibilidade histórica.
+
+Índices criados para acelerar busca por usuário e data em pedidos (`idx_orders_user_id`, `idx_orders_created_at`).
+
+## 🔄 Fluxo de Checkout (Detalhe)
+1. Frontend coleta itens e token do usuário.
+2. Envia requisição autenticada para `/api/checkout`.
+3. Backend inicia transação: cria linha em `orders`, insere cada item em `order_items`.
+4. Total agregado persistido em `orders.total_price`.
+5. Resposta retorna confirmação; histórico visível no chatbot e página Minha Conta.
+
+## 🤖 Chatbot (Engine de Intents)
+- Arquitetura separada: `chatbotCore.js` (estado / UI) + `chatbotIntents.js` (roteamento).
+- Intents respondem a palavras-chave ou números do menu.
+- Fluxos especiais: recuperação de senha, ticket e recomendação.
+- Fácil extensão: adicionar nova intent como função exportada.
+
+## 🧪 Testes & Qualidade
+Estado atual:
+- Scripts de smoke (`test-api`, `test-auth`, `verify-db`) para validação rápida.
+- Estrutura pronta para incluir **Cypress** (E2E) + **Allure** (relatórios) + **BDD Gherkin**.
+
+Roadmap de testes:
+1. E2E: login → adicionar ao carrinho → checkout → histórico.
+2. Chatbot: intents principais + fluxo de recuperação.
+3. Segurança: rejeição de operações sem token válido.
+4. API Contracts: validação de shape (ex: com Jest + Supertest).
+
+## 📂 Estrutura do Código
+```
+Backend/
+	server.js
+	db.js
+	controllers/
+	routes/
+	middlewares/
+	scripts/          # init-db, init-users-db, create/verify orders, seeds, testes
+	setup-*.sql        # scripts SQL de criação
+frontend/
+	index.html, login.html, checkout.html, minha-conta.html
+	scripts/           # main.js, checkout.js, chatbotCore.js, chatbotIntents.js
+	styles/            # CSS principal
+database/            # schema e seed consolidado (evolução)
+outros/              # documentação adicional
+README.md            # este documento
+```
+
+## 🛠 Scripts Operacionais (Backend)
+| Comando | Uso |
+|---------|-----|
+| `npm start` | Inicia API |
+| `npm run seed:gamepass` | Upsert de assinaturas Game Pass |
+| `node scripts/init-db.js` | Recria tabela `jogos` |
+| `node scripts/init-users-db.js` | Recria `usuarios` |
+| `node scripts/create-orders-tables.js` | Cria tabelas de pedidos |
+| `node scripts/verify-orders-tables.js` | Verifica estrutura de pedidos |
+| `node scripts/test-api.js` | Smoke público de rotas de jogos |
+| `node scripts/test-auth.js` | Exercita fluxo auth |
+| `node scripts/verify-db.js` | Confere conexão e imagens |
+
+## 🔧 Decisões Técnicas
+- Separação de scripts utilitários para reduzir poluição da raiz.
+- Wrapper de compatibilidade para não quebrar comandos existentes.
+- Fallback de histórico: garante continuidade durante migração de modelo.
+- Uso de arrays (`platforms TEXT[]`) para flexibilidade de catálogo.
+- Transações explícitas no checkout para evitar estados parciais.
+
+## 📈 Possíveis Evoluções
+- Testes E2E (Cypress) + Allure + Gherkin.
+- Paginação e filtros avançados em `/api/jogos`.
+- Cache de recomendações e top played (Redis).
+- Rate-limiting e validação de payload (Joi / Celebrate).
+- Internationalization (suporte multi‑idioma no frontend/chatbot).
+
+## ▶️ Execução Local
+```bash
+git clone https://github.com/JoaoPauloQA/ProjetoGameStore.git
+cd ProjetoGameStore/Backend
+npm install
+cp .env.example .env   # Ajustar DATABASE_URL e JWT_SECRET
+npm start
+```
+Seed opcional:
+```bash
+npm run seed:gamepass
+```
+Abrir o frontend: abrir `frontend/index.html` no navegador.
+
+## 📬 APIs Principais
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/api/jogos` | Lista jogos do catálogo |
+| GET | `/api/jogos/recomendado` | Jogo aleatório |
+| POST | `/api/auth/register` | Cria usuário |
+| POST | `/api/auth/login` | Autentica e retorna JWT |
+| GET | `/api/user/me` | Dados do usuário logado |
+| POST | `/api/checkout` | Cria pedido (JWT) |
+| GET | `/api/compras/historico` | Histórico unificado |
+| GET | `/api/orders/user/:id` | Pedidos do usuário |
+
+## 📊 Observabilidade Simples
+Logs estruturados (console) + scripts de verificação permitem inspeção rápida sem ferramentas externas (útil em ambientes de desenvolvimento ou avaliação técnica).
+
+
+
+## 👨‍💻 Autor
+**João Paulo QA**  
 QA Automation Engineer | Test Automation Enthusiast  
-🔗 LinkedIn  
-📧 jopaulomartinsdacostaa@gmail.com\n\n---\n\n> Dúvidas ou melhorias? Abra uma Issue ou envie sugestões.\n
+LinkedIn (inserir URL)  
+📧 jopaulomartinsdacostaa@gmail.com
+
+Esse é um projeto com fins exclusivamente acadêmico. 
+
