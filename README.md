@@ -11,12 +11,6 @@ Este projeto simula uma loja de jogos moderna:
 - Autenticação segura (registro, login, verificação de sessão).
 - Chatbot contextual com recuperação de senha, recomendação e suporte.
 
-## 💼 Por Que É Relevante Para Recrutadores
-- Mostra integração completa: frontend + backend + banco relacional.
-- Usa práticas de transação no checkout (consistência de dados).
-- Estrutura escalável (separação clara por camadas e scripts operacionais).
-- Prepara terreno para automação (scripts, organização, roadmap de testes E2E/CI).
-- Inclui fallback de dados (legado → novo modelo) evidenciando pensamento de migração.
 
 ## 🧱 Arquitetura (Resumo)
 - Frontend estático (HTML/JS) consumindo API REST.
