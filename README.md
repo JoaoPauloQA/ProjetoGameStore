@@ -165,7 +165,7 @@ Logs estruturados (console) + scripts de verificação permitem inspeção rápi
 ## 👨‍💻 Autor
 **João Paulo QA**  
 QA Automation Engineer | Test Automation Enthusiast  
-LinkedIn (inserir URL)  
+LinkedIn https://www.linkedin.com/in/jo%C3%A3o-paulo-6a1b3a207/
 📧 jopaulomartinsdacostaa@gmail.com
 
 Esse é um projeto com fins exclusivamente acadêmico. 
